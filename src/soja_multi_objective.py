@@ -164,6 +164,7 @@ def observer(population, num_generations, num_evaluations, args) :
     logger = args["logger"]
     save_directory = args["save_directory"]
     save_at_every_iteration = args["save_at_every_iteration"]
+    fitness_names = args.get("fitness_names", None)
 
     # first, a check to verify the type of library we are working with
     library_used = "unknown"
@@ -180,7 +181,7 @@ def observer(population, num_generations, num_evaluations, args) :
         best_fitness = population[0].fitness
 
     # some output
-    logger.info("Generation %d (%d evaluations), best individual fitness: %.4f" % (num_generations, num_evaluations, best_fitness))
+    logger.info("Generation %d (%d evaluations), best individual fitness: %s" % (num_generations, num_evaluations, str(best_fitness)))
 
     # save the whole population to file
     if save_at_every_iteration :
@@ -191,19 +192,28 @@ def observer(population, num_generations, num_evaluations, args) :
         logger.debug("Saving population file to \"%s\"..." % population_file_name)
 
         # create dictionary
-        dictionary_df_keys = ["generation", "fitness_value"] + ["gene_%d" % i for i in range(0, len(best_individual))]
+        dictionary_df_keys = ["generation"]
+        if fitness_names is None :
+            dictionary_df_keys += ["fitness_value_%d" % i for i in range(0, len(best_fitness))]
+        else :
+            dictionary_df_keys += fitness_names
+        dictionary_df_keys += ["gene_%d" % i for i in range(0, len(best_individual))]
+        
         dictionary_df = { k : [] for k in dictionary_df_keys }
 
         # check the different cases
-        # TODO there might be a special, custom way to conver the individual to text
-        if library_used == "inspyred" :
+        for individual in population :
 
-            for individual in population :
-
-                dictionary_df["generation"].append(num_generations)
-                dictionary_df["fitness_value"].append(individual.fitness)
-                for i in range(0, len(individual.candidate)) :
-                    dictionary_df["gene_%d" % i].append(individual.candidate[i])
+            dictionary_df["generation"].append(num_generations)
+            
+            for i in range(0, len(best_fitness)) :
+                key = "fitness_value_%d" % i
+                if fitness_names is not None :
+                    key = fitness_names[i]
+                dictionary_df[key].append(individual.fitness.values[i])
+            
+            for i in range(0, len(individual.candidate)) :
+                dictionary_df["gene_%d" % i].append(individual.candidate[i])
 
         # conver dictionary to DataFrame, save as CSV
         df = pd.DataFrame.from_dict(dictionary_df)
@@ -264,6 +274,7 @@ def fitness_function(individual, args) :
     """
 
     # for the moment, there is just a placeholder here
+    # TODO replace it with the correct fitness function
     from pymoo.problems import get_problem
     problem = get_problem("dascmop7", 12)
     
@@ -339,6 +350,7 @@ def main() :
                                 random_seed = args["random_seed"],
                                 save_directory = args["save_directory"],
                                 save_at_every_iteration = args["save_at_every_iteration"],
+                                fitness_names = ["mean_soja", "std_soja", "total_surface"],
                                 )
 
 
