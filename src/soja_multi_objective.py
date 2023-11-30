@@ -19,10 +19,12 @@ Objectives:
 import datetime
 import inspyred
 import logging
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import random
 import pandas as pd
+import seaborn as sns
 import sys
 import traceback
 
@@ -156,6 +158,54 @@ def close_logging(logger: logging.Logger) :
 
     return
 
+
+def generator(random, args) :
+    """
+    Generator function exploits numpy's instance of a pseudo-random number generator
+    to create an array of random numbers in range (min, max) with the correct shape;
+    TODO nope, when candidates are pure numpy arrays it creates several issues at
+    the level of the internal comparisions, so I decided to create individuals
+    as lists, and convert them to numpy arrays when needed. This introduces an
+    overhead on the computations, but it is easier than redoing everything.
+    """
+    #return args["nprng"].uniform(low=0.0, high=0.2, size=(args["n_dimensions"],))
+    return [random.uniform(0.0, 0.2) for _ in range(0, args["n_dimensions"])]
+
+def best_archiver_numpy(random, population, archive, args):
+    """Archive only the best individual(s).
+    
+    This function is basically a copy of 'best_archiver', but it is modified
+    to work with individuals that are numpy arrays.
+    
+    .. Arguments:
+       random -- the random number generator object
+       population -- the population of individuals
+       archive -- the current archive of individuals
+       args -- a dictionary of keyword arguments
+    
+    """
+    new_archive = archive
+    for ind in population:
+        if len(new_archive) == 0:
+            new_archive.append(ind)
+        else:
+            should_remove = []
+            should_add = True
+            for a in new_archive:
+                #if ind.candidate == a.candidate:
+                if np.array_equal(ind.candidate, a.candidate):
+                    should_add = False
+                    break
+                elif ind < a:
+                    should_add = False
+                elif ind > a:
+                    should_remove.append(a)
+            for r in should_remove:
+                new_archive.remove(r)
+            if should_add:
+                new_archive.append(ind)
+    return new_archive
+
 def observer(population, num_generations, num_evaluations, args) :
     """
     The observer is a classic function for inspyred, that prints out information and/or saves individuals. However, it can be easily re-used by other
@@ -166,19 +216,10 @@ def observer(population, num_generations, num_evaluations, args) :
     save_at_every_iteration = args["save_at_every_iteration"]
     fitness_names = args.get("fitness_names", None)
 
-    # first, a check to verify the type of library we are working with
-    library_used = "unknown"
-    if hasattr(population[0], "candidate") and hasattr(population[0], "fitness") :
-        # we are using inspyred
-        library_used = "inspyred"
-    else :
-        library_used = "cma-es"
-
     best_individual = best_fitness = None
 
-    if library_used == "inspyred" :
-        best_individual = population[0].candidate
-        best_fitness = population[0].fitness
+    best_individual = population[0].candidate
+    best_fitness = population[0].fitness
 
     # some output
     logger.info("Generation %d (%d evaluations), best individual fitness: %s" % (num_generations, num_evaluations, str(best_fitness)))
@@ -272,14 +313,38 @@ def fitness_function(individual, args) :
     """
     This is the fitness function. It should be replaced by the 'true' fitness function to be optimized.
     """
-
-    # for the moment, there is just a placeholder here
-    # TODO replace it with the correct fitness function
-    from pymoo.problems import get_problem
-    problem = get_problem("dascmop7", 12)
+    # load data
+    model_predictions = args["model_predictions"]
     
-    fitness_values, _ = problem.evaluate(np.array(individual))
-    fitness_values = inspyred.ec.emo.Pareto(fitness_values)
+    # convert individual to a more maneagable numpy array
+    individual_numpy = np.array(individual)
+
+    # first fitness function is the total soja produced over the years;
+    # second fitness function is the standard deviation inter-year;
+    # for this reason, it's better to first compute the year-by-year production
+    production_by_year = np.zeros((model_predictions.shape[1],))
+    
+    for year in range(0, model_predictions.shape[1]) :
+        
+        # select column of data corresponding to a year
+        model_predictions_year = model_predictions[:, year]
+        
+        # multiply, element-wise, each element of the candidate solution with
+        # the predicted production for the corresponding square for that year
+        production_by_year[year] = np.sum(np.multiply(individual_numpy, model_predictions_year))
+    
+    # now that we have the production by year, we can easily compute the first
+    # and second fitness values
+    mean_soja = np.mean(production_by_year)
+    std_soja = np.std(production_by_year)
+    
+    # third fitness function is easy: it's just a sum of the surfaces used in
+    # the candidate solution, so a sum of the values in the single individual
+    total_surface = np.sum(individual)
+    
+    # numerically, we subtract the mean soja production from the theoretical max,
+    # in order to transform the problem into a minimization problem
+    fitness_values = inspyred.ec.emo.Pareto([args["max_theoretical_soja"] - mean_soja, std_soja, total_surface])
 
     return fitness_values
 
@@ -291,13 +356,15 @@ def main() :
     # relevant variables are stored in a dictionary, to ensure compatibility with inspyred
     args = dict()
 
-    # unique name of the directory
-    args["log_directory"] = "unique-name"
+    # hard-coded values
+    args["data_file"] = "../data/soja.csv"
+    args["log_directory"] = "soja-allocation-3-objectives"
     args["save_directory"] = args["log_directory"]
     args["population_file_name"] = "population.csv"
     args["save_at_every_iteration"] = True # save the whole population at every iteration
     args["random_seeds"] = [42] # list of random seeds, because we might want to run the evolutionary algorithm in a loop 
     args["n_threads"] = 8 # TODO change number of threads 
+    fitness_names = ["mean_soja", "std_soja", "total_surface"]
 
     # initialize logging, using a logger that smartly manages disk occupation
     logger = initialize_logging(args["log_directory"])
@@ -308,6 +375,17 @@ def main() :
     # start program
     logger.info("Hi, I am a program, starting now!")
     logger.debug(type(logger))
+    
+    # load the matrix with all the data; the data file is supposed to contain a
+    # value for each square in Europe, for each year considered
+    #df = pd.read_csv(args["data_file"])
+    #model_predictions = df.values
+    model_predictions = np.random.random((3000, 10))
+    # compute maximum theoretical production, sum everything and divide by year
+    max_theoretical_soja = np.sum(model_predictions) / model_predictions.shape[1]
+    # also, the number of dimensions in the problem is equal to the number
+    # of squares available in Europe
+    n_dimensions = model_predictions.shape[0]
 
     # start a series of experiments, for each random seed
     for random_seed in args["random_seeds"] :
@@ -317,11 +395,12 @@ def main() :
 
         # initalization of ALL random number generators, to try and ensure repatability
         prng = random.Random(random_seed)
-        np.random.seed(random_seed) # this might become deprecated, and creating a dedicated numpy pseudo-random number generator instance would be better 
-
+        nprng = np.random.default_rng(seed=random_seed) # this might become deprecated, and creating a dedicated numpy pseudo-random number generator instance would be better 
+        
         # create an instance of EvolutionaryComputation (generic EA) and set up its parameters
         # define all parts of the evolutionary algorithm (mutation, selection, etc., including observer)
         ea = inspyred.ec.emo.NSGA2(prng)
+        #ea.archiver = best_archiver_numpy # TODO unfortunately using only numpy individuals is not possible, ec.__eq__() is giving me issues
         ea.selector = inspyred.ec.selectors.tournament_selection 
         ea.variator = [inspyred.ec.variators.n_point_crossover, inspyred.ec.variators.gaussian_mutation]
         ea.replacer = inspyred.ec.replacers.plus_replacement
@@ -329,33 +408,80 @@ def main() :
         ea.observer = observer
         ea.logger = args["logger"]
 
-        # also create a generator function
-        def generator(random, args) :
-            return [ random.uniform(0.0, 0.2) for _ in range(args["n_dimensions"]) ]
-
         final_population = ea.evolve(
                                 generator=generator,
                                 evaluator=multi_thread_evaluator,
-                                pop_size=100,
-                                num_selected=150,
+                                pop_size=1000,
+                                num_selected=2000,
                                 maximize=False,
                                 bounder=inspyred.ec.Bounder(0.0, 0.2),
                                 max_evaluations=10000,
 
                                 # all items below this line go into the 'args' dictionary passed to each function
                                 logger = args["logger"],
-                                n_dimensions = 30,
+                                n_dimensions = n_dimensions,
                                 n_threads = args["n_threads"],
                                 population_file_name = args["population_file_name"],
                                 random_seed = args["random_seed"],
                                 save_directory = args["save_directory"],
                                 save_at_every_iteration = args["save_at_every_iteration"],
-                                fitness_names = ["mean_soja", "std_soja", "total_surface"],
+                                fitness_names = fitness_names,
+                                nprng = nprng,
+                                
+                                # used to compute the fitness
+                                model_predictions = model_predictions,
+                                max_theoretical_soja = max_theoretical_soja,
                                 )
 
 
-    # TODO do something with the best individual
+    # extract the Pareto front and plot it
+    pareto_front = ea.archive
+    
+    mean_soja_values = [individual.fitness[0] for individual in pareto_front]
+    std_soja_values = [individual.fitness[1] for individual in pareto_front]
+    total_surface_values = [individual.fitness[2] for individual in pareto_front]
+    
+    sns.set_style('darkgrid')
+    
+    fig = plt.figure(figsize=(10,8))
+    ax = fig.add_subplot(projection='3d')
+    ax.scatter(mean_soja_values, std_soja_values, total_surface_values, alpha=0.7)
+    ax.set_title("Pareto front in 3D")
+    ax.set_xlabel(fitness_names[0])
+    ax.set_ylabel(fitness_names[1])
+    ax.set_zlabel(fitness_names[2])
+    plt.savefig(os.path.join(args["save_directory"], "pareto-front-3d.png"), dpi=300)
+    plt.show()
+    plt.close(fig)
+    
+    # also plot 2D projections of the plots
+    fig = plt.figure(figsize=(10,8))
+    ax = fig.add_subplot(111)
+    sns.scatterplot(x=mean_soja_values, y=std_soja_values, alpha=0.7)
+    ax.set_title("2D projection of the Pareto front")
+    ax.set_xlabel(fitness_names[0])
+    ax.set_ylabel(fitness_names[1])
+    # we also change the labels for the 'x' axis, trying to go back to the actual production
+    labels = [item.get_text() for item in ax.get_xticklabels()]
+    new_labels = ["%.2f" % (max_theoretical_soja - float(label)) for label in labels]
+    ax.set_xticklabels(new_labels)
+    plt.savefig(os.path.join(args["save_directory"], "pareto-front-%s-%s.png" % (fitness_names[0], fitness_names[1])), dpi=300)
+    plt.close(fig)
 
+    # another 2D projection
+    fig = plt.figure(figsize=(10,8))
+    ax = fig.add_subplot(111)
+    sns.scatterplot(x=mean_soja_values, y=total_surface_values, alpha=0.7)
+    ax.set_title("2D projection of the Pareto front")
+    ax.set_xlabel(fitness_names[0])
+    ax.set_ylabel(fitness_names[2])
+    # we also change the labels for the 'x' axis, trying to go back to the actual production
+    labels = [item.get_text() for item in ax.get_xticklabels()]
+    new_labels = ["%.2f" % (max_theoretical_soja - float(label)) for label in labels]
+    ax.set_xticklabels(new_labels)
+    plt.savefig(os.path.join(args["save_directory"], "pareto-front-%s-%s.png" % (fitness_names[0], fitness_names[2])), dpi=300)
+    plt.close(fig)
+    
     # close logger
     close_logging(logger)
 
