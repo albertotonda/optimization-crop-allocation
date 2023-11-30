@@ -351,8 +351,10 @@ def fitness_function(individual, args) :
 def main() :
 
     # there are a lot of moving parts inside an EA, so some modifications will still need to be performed by hand
-    
     # a few hard-coded values, to be changed depending on the problem
+    population_size = 1000
+    offspring_size = 2000
+    
     # relevant variables are stored in a dictionary, to ensure compatibility with inspyred
     args = dict()
 
@@ -404,7 +406,7 @@ def main() :
         # define all parts of the evolutionary algorithm (mutation, selection, etc., including observer)
         ea = inspyred.ec.emo.NSGA2(prng)
         #ea.archiver = best_archiver_numpy # TODO unfortunately using only numpy individuals is not possible, ec.__eq__() is giving me issues
-        ea.selector = inspyred.ec.selectors.tournament_selection 
+        ea.selector = inspyred.ec.selectors.tournament_selection # TODO as a percentage of population size, like 2%?
         ea.variator = [inspyred.ec.variators.n_point_crossover, inspyred.ec.variators.gaussian_mutation]
         ea.replacer = inspyred.ec.replacers.plus_replacement
         ea.terminator = inspyred.ec.terminators.evaluation_termination
@@ -414,11 +416,14 @@ def main() :
         final_population = ea.evolve(
                                 generator=generator,
                                 evaluator=multi_thread_evaluator,
-                                pop_size=1000,
-                                num_selected=2000,
+                                pop_size=population_size,
+                                num_selected=offspring_size,
                                 maximize=False,
                                 bounder=inspyred.ec.Bounder(0.0, 0.2),
                                 max_evaluations=10000,
+                                
+                                # parameters of operators/selectors etc.
+                                tournament_size = int(0.02 * population_size),
 
                                 # all items below this line go into the 'args' dictionary passed to each function
                                 logger = args["logger"],
