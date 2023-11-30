@@ -357,7 +357,7 @@ def main() :
     args = dict()
 
     # hard-coded values
-    args["data_file"] = "../data/soja.csv"
+    args["data_file"] = "../data/pred_2000_2017_avg.m.csv"
     args["log_directory"] = "soja-allocation-3-objectives"
     args["save_directory"] = args["log_directory"]
     args["population_file_name"] = "population.csv"
@@ -378,9 +378,12 @@ def main() :
     
     # load the matrix with all the data; the data file is supposed to contain a
     # value for each square in Europe, for each year considered
-    #df = pd.read_csv(args["data_file"])
-    #model_predictions = df.values
-    model_predictions = np.random.random((3000, 10))
+    df = pd.read_csv(args["data_file"], sep=";", decimal=",") # unfortunately in European format
+    selected_columns = [c for c in df.columns if c.startswith("2")] # get year columns, like 2001, ..., 2017
+    logger.info("Data file \"%s\" seems to include predictions for years %s..." % 
+                (args["data_file"], str(selected_columns)))
+    model_predictions = df[selected_columns].values
+
     # compute maximum theoretical production, sum everything and divide by year
     max_theoretical_soja = np.sum(model_predictions) / model_predictions.shape[1]
     # also, the number of dimensions in the problem is equal to the number
