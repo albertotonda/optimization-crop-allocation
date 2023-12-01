@@ -352,8 +352,9 @@ def main() :
 
     # there are a lot of moving parts inside an EA, so some modifications will still need to be performed by hand
     # a few hard-coded values, to be changed depending on the problem
-    population_size = 1000
-    offspring_size = 2000
+    population_size = 10000
+    offspring_size = 20000
+    max_evaluations = 1000000
     
     # relevant variables are stored in a dictionary, to ensure compatibility with inspyred
     args = dict()
@@ -365,7 +366,7 @@ def main() :
     args["population_file_name"] = "population.csv"
     args["save_at_every_iteration"] = True # save the whole population at every iteration
     args["random_seeds"] = [42] # list of random seeds, because we might want to run the evolutionary algorithm in a loop 
-    args["n_threads"] = 8 # TODO change number of threads 
+    args["n_threads"] = 60 # TODO change number of threads 
     fitness_names = ["mean_soja", "std_soja", "total_surface"]
 
     # initialize logging, using a logger that smartly manages disk occupation
@@ -406,7 +407,7 @@ def main() :
         # define all parts of the evolutionary algorithm (mutation, selection, etc., including observer)
         ea = inspyred.ec.emo.NSGA2(prng)
         #ea.archiver = best_archiver_numpy # TODO unfortunately using only numpy individuals is not possible, ec.__eq__() is giving me issues
-        ea.selector = inspyred.ec.selectors.tournament_selection # TODO as a percentage of population size, like 2%?
+        ea.selector = inspyred.ec.selectors.tournament_selection 
         ea.variator = [inspyred.ec.variators.n_point_crossover, inspyred.ec.variators.gaussian_mutation]
         ea.replacer = inspyred.ec.replacers.plus_replacement
         ea.terminator = inspyred.ec.terminators.evaluation_termination
@@ -420,7 +421,7 @@ def main() :
                                 num_selected=offspring_size,
                                 maximize=False,
                                 bounder=inspyred.ec.Bounder(0.0, 0.2),
-                                max_evaluations=10000,
+                                max_evaluations=max_evaluations,
                                 
                                 # parameters of operators/selectors etc.
                                 tournament_size = int(0.02 * population_size),
