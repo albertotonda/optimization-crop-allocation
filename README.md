@@ -29,7 +29,7 @@ Multi-objective approach to the problem of soja crops allocation:
 - minimize surface
 
 ## TODO
-EA (single- or multi-objective), using threads.
+Add fitness penalty to push individuals to have as many values as possible set to zero.
 
 ## Links to data and/or papers
 https://doi.org/10.6084/m9.figshare.11903277
