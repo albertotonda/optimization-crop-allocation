@@ -262,6 +262,41 @@ def observer(population, num_generations, num_evaluations, args) :
 
     return
 
+def save_population_to_csv(population, num_generations, population_file_name, fitness_names) :
+
+    best_individual = population[0].candidate
+    best_fitness = population[0].fitness
+
+    # create dictionary
+    dictionary_df_keys = ["generation"]
+    if fitness_names is None :
+        dictionary_df_keys += ["fitness_value_%d" % i for i in range(0, len(best_fitness))]
+    else :
+        dictionary_df_keys += fitness_names
+    dictionary_df_keys += ["gene_%d" % i for i in range(0, len(best_individual))]
+    
+    dictionary_df = { k : [] for k in dictionary_df_keys }
+
+    # check the different cases
+    for individual in population :
+
+        dictionary_df["generation"].append(num_generations)
+        
+        for i in range(0, len(best_fitness)) :
+            key = "fitness_value_%d" % i
+            if fitness_names is not None :
+                key = fitness_names[i]
+            dictionary_df[key].append(individual.fitness.values[i])
+        
+        for i in range(0, len(individual.candidate)) :
+            dictionary_df["gene_%d" % i].append(individual.candidate[i])
+
+    # conver dictionary to DataFrame, save as CSV
+    df = pd.DataFrame.from_dict(dictionary_df)
+    df.to_csv(population_file_name, index=False)
+
+    return
+
 def multi_thread_evaluator(candidates, args) :
     """
     Wrapper function for multi-thread evaluation of the fitness.
@@ -354,7 +389,7 @@ def main() :
     # a few hard-coded values, to be changed depending on the problem
     population_size = 10000
     offspring_size = 20000
-    max_evaluations = 1000000
+    max_evaluations = 10000000
     
     # relevant variables are stored in a dictionary, to ensure compatibility with inspyred
     args = dict()
@@ -490,6 +525,9 @@ def main() :
     ax.set_xticklabels(new_labels)
     plt.savefig(os.path.join(args["save_directory"], "pareto-front-%s-%s.png" % (fitness_names[0], fitness_names[2])), dpi=300)
     plt.close(fig)
+
+    # save final archive (Pareto front) to csv
+    save_population_to_csv(pareto_front, ea.num_generations, os.path.join(args["save_directory"], "final-pareto-front.csv"), fitness_names)
     
     # close logger
     close_logging(logger)
