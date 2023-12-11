@@ -398,7 +398,7 @@ def main() :
     args["data_file"] = "../data/pred_2000_2017_avg.m.csv"
     args["log_directory"] = "soja-allocation-3-objectives"
     args["save_directory"] = args["log_directory"]
-    args["population_file_name"] = "population.csv"
+    args["population_file_name"] = "population"
     args["save_at_every_iteration"] = True # save the whole population at every iteration
     args["random_seeds"] = [42] # list of random seeds, because we might want to run the evolutionary algorithm in a loop 
     args["n_threads"] = 60 # TODO change number of threads 
