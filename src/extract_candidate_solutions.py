@@ -66,7 +66,7 @@ if __name__ == "__main__" :
         print("Individual %d: fitness values read %.4e %.4e %.4e; recomputed %.4e %.4e %.4e" %
               (index, row["mean_soja"], row["std_soja"], row["total_surface"], max_theoretical_soja - mean_soja, std_soja, total_surface))
         
-        print("Mean soja production: %.4f" % mean_soja)
+        print("Mean soja production: %.4e ; std: %.4e" % (mean_soja, std_soja))
         
     # let's perform another extraction, this time using a different formalism
     keys = ["id", "x", "y"] + ["best_" + fn for fn in fitness_names]

@@ -387,9 +387,9 @@ def main() :
 
     # there are a lot of moving parts inside an EA, so some modifications will still need to be performed by hand
     # a few hard-coded values, to be changed depending on the problem
-    population_size = 10000
-    offspring_size = 20000
-    max_evaluations = 10000000
+    population_size = 100
+    offspring_size = 200
+    max_evaluations = 1000
     
     # relevant variables are stored in a dictionary, to ensure compatibility with inspyred
     args = dict()
@@ -458,8 +458,13 @@ def main() :
                                 bounder=inspyred.ec.Bounder(0.0, 0.2),
                                 max_evaluations=max_evaluations,
                                 
-                                # parameters of operators/selectors etc.
+                                # parameters of the tournament selection
                                 tournament_size = int(0.02 * population_size),
+                                # parameters of the Gaussian mutation
+                                mutation_rate = 0.1, # applied as an element-by-element basis
+                                gaussian_mean = 0.0,
+                                gaussian_stdev = 0.1, # default was 1
+                                crossover_rate = 0.8,
 
                                 # all items below this line go into the 'args' dictionary passed to each function
                                 logger = args["logger"],
