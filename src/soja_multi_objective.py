@@ -221,8 +221,19 @@ def observer(population, num_generations, num_evaluations, args) :
     best_individual = population[0].candidate
     best_fitness = population[0].fitness
 
+    # 'best fitness' does not mean much here; let's try to find the best value for each one
+    # this is useful to know if they actually improve over time
+    best_values = []
+    for i in range(0, len(best_fitness)) :
+        best_value = None
+        for individual in population :
+            if best_value is None or individual.fitness[i] < best_value :
+                best_value = individual.fitness[i]
+        best_values.append(best_value)
+
     # some output
-    logger.info("Generation %d (%d evaluations), best individual fitness: %s" % (num_generations, num_evaluations, str(best_fitness)))
+    best_values_string = ";".join(["%.4e" % bv for bv in best_values])
+    logger.info("Generation %d (%d evaluations), best individual fitness: %s" % (num_generations, num_evaluations, best_values_string))
 
     # save the whole population to file
     if save_at_every_iteration :
@@ -259,6 +270,10 @@ def observer(population, num_generations, num_evaluations, args) :
         # conver dictionary to DataFrame, save as CSV
         df = pd.DataFrame.from_dict(dictionary_df)
         df.to_csv(population_file_name, index=False)
+
+        # save archive (current Pareto front)
+        archive = args["_ec"].archive
+        save_population_to_csv(archive, num_generations, os.path.join(save_directory, "%d-gen-%d-archive.csv" % (args["random_seed"], num_generations)), fitness_names)
 
     return
 
@@ -387,9 +402,9 @@ def main() :
 
     # there are a lot of moving parts inside an EA, so some modifications will still need to be performed by hand
     # a few hard-coded values, to be changed depending on the problem
-    population_size = 100
-    offspring_size = 200
-    max_evaluations = 1000
+    population_size = 1000
+    offspring_size = 2000
+    max_evaluations = 1000000
     
     # relevant variables are stored in a dictionary, to ensure compatibility with inspyred
     args = dict()
@@ -442,9 +457,9 @@ def main() :
         # define all parts of the evolutionary algorithm (mutation, selection, etc., including observer)
         ea = inspyred.ec.emo.NSGA2(prng)
         #ea.archiver = best_archiver_numpy # TODO unfortunately using only numpy individuals is not possible, ec.__eq__() is giving me issues
-        ea.selector = inspyred.ec.selectors.tournament_selection 
+        #ea.selector = inspyred.ec.selectors.tournament_selection 
         ea.variator = [inspyred.ec.variators.n_point_crossover, inspyred.ec.variators.gaussian_mutation]
-        ea.replacer = inspyred.ec.replacers.plus_replacement
+        #ea.replacer = inspyred.ec.replacers.plus_replacement
         ea.terminator = inspyred.ec.terminators.evaluation_termination
         ea.observer = observer
         ea.logger = args["logger"]
@@ -459,11 +474,11 @@ def main() :
                                 max_evaluations=max_evaluations,
                                 
                                 # parameters of the tournament selection
-                                tournament_size = int(0.02 * population_size),
+                                tournament_size = 2,
                                 # parameters of the Gaussian mutation
                                 mutation_rate = 0.1, # applied as an element-by-element basis
                                 gaussian_mean = 0.0,
-                                gaussian_stdev = 0.1, # default was 1
+                                gaussian_stdev = 0.05, # default was 1
                                 crossover_rate = 0.8,
 
                                 # all items below this line go into the 'args' dictionary passed to each function
@@ -512,7 +527,7 @@ def main() :
     ax.set_ylabel(fitness_names[1])
     # we also change the labels for the 'x' axis, trying to go back to the actual production
     labels = [item.get_text() for item in ax.get_xticklabels()]
-    new_labels = ["%.2f" % (max_theoretical_soja - float(label)) for label in labels]
+    new_labels = ["%.2e" % (max_theoretical_soja - float(label)) for label in labels]
     ax.set_xticklabels(new_labels)
     plt.savefig(os.path.join(args["save_directory"], "pareto-front-%s-%s.png" % (fitness_names[0], fitness_names[1])), dpi=300)
     plt.close(fig)
@@ -526,7 +541,7 @@ def main() :
     ax.set_ylabel(fitness_names[2])
     # we also change the labels for the 'x' axis, trying to go back to the actual production
     labels = [item.get_text() for item in ax.get_xticklabels()]
-    new_labels = ["%.2f" % (max_theoretical_soja - float(label)) for label in labels]
+    new_labels = ["%.2e" % (max_theoretical_soja - float(label)) for label in labels]
     ax.set_xticklabels(new_labels)
     plt.savefig(os.path.join(args["save_directory"], "pareto-front-%s-%s.png" % (fitness_names[0], fitness_names[2])), dpi=300)
     plt.close(fig)
