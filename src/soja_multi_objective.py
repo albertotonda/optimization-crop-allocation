@@ -405,6 +405,12 @@ def main() :
     population_size = 1000
     offspring_size = 2000
     max_evaluations = 1000000
+
+    mutation_rate = 0.1
+    mutation_mean = 0.0
+    mutation_stdev = 0.1
+
+    crossover_rate = 0.8
     
     # relevant variables are stored in a dictionary, to ensure compatibility with inspyred
     args = dict()
@@ -464,6 +470,9 @@ def main() :
         ea.observer = observer
         ea.logger = args["logger"]
 
+        # printout with the experimental parameters
+        logger.info("Experimental hyperparameters of NSGA-II: population size=%d, offspring size=%d, stop condition after %d evaluations, tournament selection size=%d, mutation rate=%.4f, mutation mean=%.4f, mutation stdev=%.4f, crossover rate=%.4f" % (population_size, offspring_size, max_evaluations, mutation_rate, mutation_mean, mutation_stdev, crossover_rate))
+
         final_population = ea.evolve(
                                 generator=generator,
                                 evaluator=multi_thread_evaluator,
@@ -474,12 +483,12 @@ def main() :
                                 max_evaluations=max_evaluations,
                                 
                                 # parameters of the tournament selection
-                                tournament_size = 2,
+                                #tournament_size = 2,
                                 # parameters of the Gaussian mutation
-                                mutation_rate = 0.1, # applied as an element-by-element basis
-                                gaussian_mean = 0.0,
-                                gaussian_stdev = 0.05, # default was 1
-                                crossover_rate = 0.8,
+                                mutation_rate = mutation_rate, # applied as an element-by-element basis
+                                gaussian_mean = mutation_mean,
+                                gaussian_stdev = mutation_stdev, # default was 1
+                                crossover_rate = crossover_rate,
 
                                 # all items below this line go into the 'args' dictionary passed to each function
                                 logger = args["logger"],
