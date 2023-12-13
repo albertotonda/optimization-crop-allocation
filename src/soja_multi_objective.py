@@ -232,8 +232,8 @@ def observer(population, num_generations, num_evaluations, args) :
         best_values.append(best_value)
 
     # some output
-    best_values_string = ";".join(["%.4e" % bv for bv in best_values])
-    logger.info("Generation %d (%d evaluations), best individual fitness: %s" % (num_generations, num_evaluations, best_values_string))
+    best_values_string = "; ".join(["%.4e" % bv for bv in best_values])
+    logger.info("Generation %d (%d evaluations), best fitness value found for each fitness function: %s" % (num_generations, num_evaluations, best_values_string))
 
     # save the whole population to file
     if save_at_every_iteration :
@@ -272,7 +272,7 @@ def observer(population, num_generations, num_evaluations, args) :
         df.to_csv(population_file_name, index=False)
 
         # save archive (current Pareto front)
-        archive = args["_ec"].archive
+        archive = args["_ec"].archive # key "_ec" corresponds to the current instance of the evolutionary algorithm
         save_population_to_csv(archive, num_generations, os.path.join(save_directory, "%d-gen-%d-archive.csv" % (args["random_seed"], num_generations)), fitness_names)
 
     return
@@ -402,9 +402,10 @@ def main() :
 
     # there are a lot of moving parts inside an EA, so some modifications will still need to be performed by hand
     # a few hard-coded values, to be changed depending on the problem
-    population_size = 1000
-    offspring_size = 2000
+    population_size = 100
+    offspring_size = 200
     max_evaluations = 1000000
+    tournament_selection_size = 2
 
     mutation_rate = 0.1
     mutation_mean = 0.0
@@ -448,6 +449,13 @@ def main() :
     # also, the number of dimensions in the problem is equal to the number
     # of squares available in Europe
     n_dimensions = model_predictions.shape[0]
+    
+    # TODO it could be interesting to add two "extreme" individuals to the initial
+    # population: one trivial solution with all parameters at 0.0, and one with all
+    # parameters at 0.2; however, we should try this AFTER regular experiments
+    seed_no_surface = [0.0] * n_dimensions
+    seed_all_surface = [0.2] * n_dimensions
+    seeds = [seed_no_surface, seed_all_surface]
 
     # start a series of experiments, for each random seed
     for random_seed in args["random_seeds"] :
@@ -462,7 +470,6 @@ def main() :
         # create an instance of EvolutionaryComputation (generic EA) and set up its parameters
         # define all parts of the evolutionary algorithm (mutation, selection, etc., including observer)
         ea = inspyred.ec.emo.NSGA2(prng)
-        #ea.archiver = best_archiver_numpy # TODO unfortunately using only numpy individuals is not possible, ec.__eq__() is giving me issues
         #ea.selector = inspyred.ec.selectors.tournament_selection 
         ea.variator = [inspyred.ec.variators.n_point_crossover, inspyred.ec.variators.gaussian_mutation]
         #ea.replacer = inspyred.ec.replacers.plus_replacement
@@ -471,7 +478,8 @@ def main() :
         ea.logger = args["logger"]
 
         # printout with the experimental parameters
-        logger.info("Experimental hyperparameters of NSGA-II: population size=%d, offspring size=%d, stop condition after %d evaluations, tournament selection size=%d, mutation rate=%.4f, mutation mean=%.4f, mutation stdev=%.4f, crossover rate=%.4f" % (population_size, offspring_size, max_evaluations, mutation_rate, mutation_mean, mutation_stdev, crossover_rate))
+        logger.info("Experimental hyperparameters of NSGA-II: population size=%d, offspring size=%d, stop condition after %d evaluations, tournament selection size=%d, mutation rate=%.4f, mutation mean=%.4f, mutation stdev=%.4f, crossover rate=%.4f" % 
+                    (population_size, offspring_size, max_evaluations, tournament_selection_size, mutation_rate, mutation_mean, mutation_stdev, crossover_rate))
 
         final_population = ea.evolve(
                                 generator=generator,
@@ -483,12 +491,15 @@ def main() :
                                 max_evaluations=max_evaluations,
                                 
                                 # parameters of the tournament selection
-                                #tournament_size = 2,
+                                tournament_size = tournament_selection_size,
                                 # parameters of the Gaussian mutation
                                 mutation_rate = mutation_rate, # applied as an element-by-element basis
                                 gaussian_mean = mutation_mean,
                                 gaussian_stdev = mutation_stdev, # default was 1
                                 crossover_rate = crossover_rate,
+                                
+                                # seeding: adding handcrafted individuals to the initial population
+                                #seeds = seeds,
 
                                 # all items below this line go into the 'args' dictionary passed to each function
                                 logger = args["logger"],
