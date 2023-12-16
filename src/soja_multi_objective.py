@@ -235,45 +235,60 @@ def observer(population, num_generations, num_evaluations, args) :
     best_values_string = "; ".join(["%.4e" % bv for bv in best_values])
     logger.info("Generation %d (%d evaluations), best fitness value found for each fitness function: %s" % (num_generations, num_evaluations, best_values_string))
 
-    # save the whole population to file
-    if save_at_every_iteration :
+    # depending on a flag we set, we either save the population at each generation separately, or we overwrite the file each time;
+    # the first solution allows us to track the development of the optimization, the second saves disk space
+    population_file_name = "%d-%s-generation-%d.csv" % (args["random_seed"], args["population_file_name"], num_generations)
+    if args["overwrite_save_files"] == True :
+        population_file_name = "%d-%s-last-generation.csv" % (args["random_seed"], args["population_file_name"])
+    logger.info("Saving population file as \"%s\"..." % population_file_name)
 
-        # create file name, with information on random seed and population
-        population_file_name = "%d-%s-generation-%d.csv" % (args["random_seed"], args["population_file_name"], num_generations)
-        population_file_name = os.path.join(save_directory, population_file_name)
-        logger.debug("Saving population file to \"%s\"..." % population_file_name)
+    population_file_name = os.path.join(save_directory, population_file_name)
+    save_population_to_csv(population, num_generations, population_file_name, fitness_names)
+
+    # save archive (current Pareto front)
+    archive_file_name = "%d-gen-%d-archive.csv" % (args["random_seed"], num_generations)
+    if args["overwrite_save_files"] == True :
+        archive_file_name = "%d-archive.csv" % args["random_seed"]
+    logger.info("Saving archive file as \"%s\"..." % archive_file_name)
+
+    archive = args["_ec"].archive # key "_ec" corresponds to the current instance of the evolutionary algorithm
+    save_population_to_csv(archive, num_generations, os.path.join(save_directory, archive_file_name), fitness_names)
+
+    # old code
+    # save the whole population to file
+    #if save_at_every_iteration :
+
+        ## create file name, with information on random seed and population
+        #population_file_name = os.path.join(save_directory, population_file_name)
+        #logger.debug("Saving population file to \"%s\"..." % population_file_name)
 
         # create dictionary
-        dictionary_df_keys = ["generation"]
-        if fitness_names is None :
-            dictionary_df_keys += ["fitness_value_%d" % i for i in range(0, len(best_fitness))]
-        else :
-            dictionary_df_keys += fitness_names
-        dictionary_df_keys += ["gene_%d" % i for i in range(0, len(best_individual))]
-        
-        dictionary_df = { k : [] for k in dictionary_df_keys }
-
-        # check the different cases
-        for individual in population :
-
-            dictionary_df["generation"].append(num_generations)
-            
-            for i in range(0, len(best_fitness)) :
-                key = "fitness_value_%d" % i
-                if fitness_names is not None :
-                    key = fitness_names[i]
-                dictionary_df[key].append(individual.fitness.values[i])
-            
-            for i in range(0, len(individual.candidate)) :
-                dictionary_df["gene_%d" % i].append(individual.candidate[i])
-
-        # conver dictionary to DataFrame, save as CSV
-        df = pd.DataFrame.from_dict(dictionary_df)
-        df.to_csv(population_file_name, index=False)
-
-        # save archive (current Pareto front)
-        archive = args["_ec"].archive # key "_ec" corresponds to the current instance of the evolutionary algorithm
-        save_population_to_csv(archive, num_generations, os.path.join(save_directory, "%d-gen-%d-archive.csv" % (args["random_seed"], num_generations)), fitness_names)
+        #dictionary_df_keys = ["generation"]
+        #if fitness_names is None :
+        #    dictionary_df_keys += ["fitness_value_%d" % i for i in range(0, len(best_fitness))]
+        #else :
+        #    dictionary_df_keys += fitness_names
+        #dictionary_df_keys += ["gene_%d" % i for i in range(0, len(best_individual))]
+        #
+        #dictionary_df = { k : [] for k in dictionary_df_keys }
+        #
+        ## check the different cases
+        #for individual in population :
+        #
+        #    dictionary_df["generation"].append(num_generations)
+        #    
+        #    for i in range(0, len(best_fitness)) :
+        #        key = "fitness_value_%d" % i
+        #        if fitness_names is not None :
+        #            key = fitness_names[i]
+        #        dictionary_df[key].append(individual.fitness.values[i])
+        #    
+        #    for i in range(0, len(individual.candidate)) :
+        #        dictionary_df["gene_%d" % i].append(individual.candidate[i])
+        #
+        ## conver dictionary to DataFrame, save as CSV
+        #df = pd.DataFrame.from_dict(dictionary_df)
+        #df.to_csv(population_file_name, index=False)
 
     return
 
@@ -394,7 +409,9 @@ def fitness_function(individual, args) :
     
     # numerically, we subtract the mean soja production from the theoretical max,
     # in order to transform the problem into a minimization problem
-    fitness_values = inspyred.ec.emo.Pareto([args["max_theoretical_soja"] - mean_soja, std_soja, total_surface])
+    #fitness_values = inspyred.ec.emo.Pareto([args["max_theoretical_soja"] - mean_soja, std_soja, total_surface])
+    # NOTE new attempt, we just use a negative value
+    fitness_values = inspyred.ec.emo.Pareto([-1 * mean_soja, std_soja, total_surface])
 
     return fitness_values
 
@@ -402,16 +419,19 @@ def main() :
 
     # there are a lot of moving parts inside an EA, so some modifications will still need to be performed by hand
     # a few hard-coded values, to be changed depending on the problem
-    population_size = 100
-    offspring_size = 200
-    max_evaluations = 1000000
-    tournament_selection_size = 2
+    population_size = int(1e4)
+    offspring_size = int(2e4)
+    max_evaluations = int(1e8)
+    tournament_selection_size = int(0.02 * population_size)
 
     mutation_rate = 0.1
     mutation_mean = 0.0
     mutation_stdev = 0.1
 
     crossover_rate = 0.8
+
+    # options for logging and saving files
+    overwrite_save_files = True
     
     # relevant variables are stored in a dictionary, to ensure compatibility with inspyred
     args = dict()
@@ -509,6 +529,7 @@ def main() :
                                 random_seed = args["random_seed"],
                                 save_directory = args["save_directory"],
                                 save_at_every_iteration = args["save_at_every_iteration"],
+                                overwrite_save_files = overwrite_save_files,
                                 fitness_names = fitness_names,
                                 nprng = nprng,
                                 
@@ -546,9 +567,9 @@ def main() :
     ax.set_xlabel(fitness_names[0])
     ax.set_ylabel(fitness_names[1])
     # we also change the labels for the 'x' axis, trying to go back to the actual production
-    labels = [item.get_text() for item in ax.get_xticklabels()]
-    new_labels = ["%.2e" % (max_theoretical_soja - float(label)) for label in labels]
-    ax.set_xticklabels(new_labels)
+    #labels = [item.get_text() for item in ax.get_xticklabels()]
+    #new_labels = ["%.2e" % (max_theoretical_soja - float(label)) for label in labels]
+    #ax.set_xticklabels(new_labels)
     plt.savefig(os.path.join(args["save_directory"], "pareto-front-%s-%s.png" % (fitness_names[0], fitness_names[1])), dpi=300)
     plt.close(fig)
 
@@ -560,9 +581,9 @@ def main() :
     ax.set_xlabel(fitness_names[0])
     ax.set_ylabel(fitness_names[2])
     # we also change the labels for the 'x' axis, trying to go back to the actual production
-    labels = [item.get_text() for item in ax.get_xticklabels()]
-    new_labels = ["%.2e" % (max_theoretical_soja - float(label)) for label in labels]
-    ax.set_xticklabels(new_labels)
+    #labels = [item.get_text() for item in ax.get_xticklabels()]
+    #new_labels = ["%.2e" % (max_theoretical_soja - float(label)) for label in labels]
+    #ax.set_xticklabels(new_labels)
     plt.savefig(os.path.join(args["save_directory"], "pareto-front-%s-%s.png" % (fitness_names[0], fitness_names[2])), dpi=300)
     plt.close(fig)
 
