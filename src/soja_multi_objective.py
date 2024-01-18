@@ -246,7 +246,7 @@ def observer(population, num_generations, num_evaluations, args) :
     save_population_to_csv(population, num_generations, population_file_name, fitness_names)
 
     # save archive (current Pareto front)
-    archive_file_name = "%d-gen-%d-archive.csv" % (args["random_seed"], num_generations)
+    archive_file_name = "%d-archive-generation-%d.csv" % (args["random_seed"], num_generations)
     if args["overwrite_save_files"] == True :
         archive_file_name = "%d-archive.csv" % args["random_seed"]
     logger.info("Saving archive file as \"%s\"..." % archive_file_name)
@@ -419,9 +419,9 @@ def main() :
 
     # there are a lot of moving parts inside an EA, so some modifications will still need to be performed by hand
     # a few hard-coded values, to be changed depending on the problem
-    population_size = int(1e4)
-    offspring_size = int(2e4)
-    max_evaluations = int(1e8)
+    population_size = int(1e3)
+    offspring_size = int(2e3)
+    max_evaluations = int(1e6)
     tournament_selection_size = int(0.02 * population_size)
 
     mutation_rate = 0.1
@@ -431,7 +431,7 @@ def main() :
     crossover_rate = 0.8
 
     # options for logging and saving files
-    overwrite_save_files = True
+    overwrite_save_files = False
     
     # relevant variables are stored in a dictionary, to ensure compatibility with inspyred
     args = dict()
