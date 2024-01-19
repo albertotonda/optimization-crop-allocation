@@ -342,7 +342,8 @@ def multi_thread_evaluator(candidates, args) :
 
     # create Lock object and initialize thread pool
     thread_lock = Lock()
-    thread_pool = ThreadPool(n_threads) 
+    #thread_pool = ThreadPool(n_threads) 
+    thread_pool = args["thread_pool"]
 
     # create list of arguments for threads
     arguments = [ (candidates[i], args, i, fitness_list, thread_lock) for i in range(0, len(candidates)) ]
@@ -421,7 +422,7 @@ def main() :
     # a few hard-coded values, to be changed depending on the problem
     population_size = int(1e3)
     offspring_size = int(2e3)
-    max_evaluations = int(1e6)
+    max_evaluations = int(5e6)
     tournament_selection_size = int(0.02 * population_size)
 
     mutation_rate = 0.1
@@ -437,8 +438,9 @@ def main() :
     args = dict()
 
     # hard-coded values
-    args["data_file"] = "../data/pred_2000_2017_avg.m.csv"
-    args["log_directory"] = "soja-allocation-3-objectives"
+    #args["data_file"] = "../data/pred_2000_2017_avg.m.csv"
+    args["data_file"] = "../data/soybean_pred_2000_2023_avg.m_s20.csv"
+    args["log_directory"] = "2024-01-19-soja-allocation-3-objectives"
     args["save_directory"] = args["log_directory"]
     args["population_file_name"] = "population"
     args["save_at_every_iteration"] = True # save the whole population at every iteration
@@ -469,6 +471,10 @@ def main() :
     # also, the number of dimensions in the problem is equal to the number
     # of squares available in Europe
     n_dimensions = model_predictions.shape[0]
+
+    # also, let's initialize the ThreadPool here, so that we just pass it to the functions later
+    # and we do not need to create a new one every time we start the evaluations
+    thread_pool = ThreadPool(n_threads)
     
     # TODO it could be interesting to add two "extreme" individuals to the initial
     # population: one trivial solution with all parameters at 0.0, and one with all
@@ -532,6 +538,7 @@ def main() :
                                 overwrite_save_files = overwrite_save_files,
                                 fitness_names = fitness_names,
                                 nprng = nprng,
+                                thread_pool = thread_pool,
                                 
                                 # used to compute the fitness
                                 model_predictions = model_predictions,
