@@ -29,8 +29,8 @@ Multi-objective approach to the problem of soja crops allocation:
 - minimize surface
 
 ## TODO
-1. Add fitness penalty to push individuals to have as many values as possible set to zero.
-2. Single-objective optimization to just maximize soja production, to see what happens and compare against the multi-objective results.
+1. Compare Pareto fronts of 2- and 3-objective runs. What are the best solutions found?
+2. What happens if we inject the two "best" solutions as seeds?
 
 ## Links to data and/or papers
 https://doi.org/10.6084/m9.figshare.11903277
