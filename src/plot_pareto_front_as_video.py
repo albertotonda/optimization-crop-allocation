@@ -24,6 +24,9 @@ def main() :
     target_directory = "soja-allocation-3-objectives"
     pareto_front_files = [f for f in os.listdir(target_directory) if f.endswith(".csv") and f.find("archive-generation") != -1]
     
+    target_directory = "../results/2024-01-19-soja-allocation-3-objectives"
+    pareto_front_files = [f for f in os.listdir(target_directory) if f.endswith(".csv") and f.find("archive") != -1]
+    
     # set cool style for figures
     sns.set_style(style='darkgrid')
     
@@ -35,19 +38,23 @@ def main() :
     id_and_file = [ [int(regex.search(regular_expression, f).group(1)), f] for f in pareto_front_files]
     id_and_file = sorted(id_and_file, key=lambda x : x[0])
     
-    print("Sorted list of files:", id_and_file)
+    print("Sorted list of %d files: %s" % (len(id_and_file), str(id_and_file)))
     
     # before starting the plotting, we need to get the smallest values for each
     # fitness value, likely in the last file (as this is a minimization problem)
     df = pd.read_csv(os.path.join(target_directory, id_and_file[-1][1]))
     x_smallest = df[fitness_x].values.min()
     y_smallest = df[fitness_y].values.min()
+    # actually, maybe all values (min and max) should be taken from just the last file,
+    # as the last archive is the most likely to have a vaster spread
+    x_largest = df[fitness_x].values.max()
+    y_largest = df[fitness_y].values.max()    
     
     # now, we find the largest values (in file #0)
-    file_name = id_and_file[0][1]
-    df = pd.read_csv(os.path.join(target_directory, file_name))
-    x_largest = df[fitness_x].values.max()
-    y_largest = df[fitness_y].values.max()
+    #file_name = id_and_file[0][1]
+    #df = pd.read_csv(os.path.join(target_directory, file_name))
+    #x_largest = df[fitness_x].values.max()
+    #y_largest = df[fitness_y].values.max()
     
     print("Limits of the axes: x=[%.2e,%.2e], y=[%.2e,%.2e]" % (x_smallest, x_largest, y_smallest, y_largest))
     
@@ -57,8 +64,12 @@ def main() :
     #pareto_front = sns.scatterplot(data=df, x=fitness_x, y=fitness_y, alpha=0.3, ax=ax)
     pareto_front = ax.scatter(df[fitness_x].values, df[fitness_y].values, color="blue", alpha=0.7)
     ax.set_title("Pareto front at generation 0")
-    #ax.set(xlim=[x_smallest, x_largest], ylim=[y_smallest, y_largest], xlabel=fitness_x, ylabel=fitness_y)
-    ax.set(xlim=[-4.8e7, -3.0e7], ylim=[1.5e6, 2.4e6], xlabel=fitness_x, ylabel=fitness_y)
+    
+    # I had to hard-code this, it's not very pretty
+    ax.set(xlim=[x_smallest - 0.05 * abs(x_smallest), x_largest + 0.05 * abs(x_largest)] , 
+           ylim=[y_smallest - 0.05 * abs(y_smallest), y_largest + 0.05 * abs(y_largest)], 
+           xlabel=fitness_x, ylabel=fitness_y)
+    #ax.set(xlim=[-4.8e7, -3.0e7], ylim=[1.5e6, 2.4e6], xlabel=fitness_x, ylabel=fitness_y) # this is kinda bad
     
     def update(frame, ax=ax, id_and_file=id_and_file, pareto_front=pareto_front) :
         
@@ -70,7 +81,7 @@ def main() :
         data = np.stack([df[fitness_x].values, df[fitness_y].values]).T
         pareto_front.set_offsets(data)
         
-        ax.set_title("Pareto front at generation %d" % frame)
+        ax.set_title("Pareto front at generation %d" % id_and_file[frame][0])
         
         return
     
