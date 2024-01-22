@@ -168,8 +168,7 @@ def generator(random, args) :
     as lists, and convert them to numpy arrays when needed. This introduces an
     overhead on the computations, but it is easier than redoing everything.
     """
-    #return args["nprng"].uniform(low=0.0, high=0.2, size=(args["n_dimensions"],))
-    return [random.uniform(0.0, 0.2) for _ in range(0, args["n_dimensions"])]
+    return [random.uniform(0.0, 0.1) for _ in range(0, args["n_dimensions"])]
 
 def best_archiver_numpy(random, population, archive, args):
     """Archive only the best individual(s).
@@ -253,42 +252,6 @@ def observer(population, num_generations, num_evaluations, args) :
 
     archive = args["_ec"].archive # key "_ec" corresponds to the current instance of the evolutionary algorithm
     save_population_to_csv(archive, num_generations, os.path.join(save_directory, archive_file_name), fitness_names)
-
-    # old code
-    # save the whole population to file
-    #if save_at_every_iteration :
-
-        ## create file name, with information on random seed and population
-        #population_file_name = os.path.join(save_directory, population_file_name)
-        #logger.debug("Saving population file to \"%s\"..." % population_file_name)
-
-        # create dictionary
-        #dictionary_df_keys = ["generation"]
-        #if fitness_names is None :
-        #    dictionary_df_keys += ["fitness_value_%d" % i for i in range(0, len(best_fitness))]
-        #else :
-        #    dictionary_df_keys += fitness_names
-        #dictionary_df_keys += ["gene_%d" % i for i in range(0, len(best_individual))]
-        #
-        #dictionary_df = { k : [] for k in dictionary_df_keys }
-        #
-        ## check the different cases
-        #for individual in population :
-        #
-        #    dictionary_df["generation"].append(num_generations)
-        #    
-        #    for i in range(0, len(best_fitness)) :
-        #        key = "fitness_value_%d" % i
-        #        if fitness_names is not None :
-        #            key = fitness_names[i]
-        #        dictionary_df[key].append(individual.fitness.values[i])
-        #    
-        #    for i in range(0, len(individual.candidate)) :
-        #        dictionary_df["gene_%d" % i].append(individual.candidate[i])
-        #
-        ## conver dictionary to DataFrame, save as CSV
-        #df = pd.DataFrame.from_dict(dictionary_df)
-        #df.to_csv(population_file_name, index=False)
 
     return
 
@@ -381,6 +344,7 @@ def fitness_function(individual, args) :
     """
     # load data
     model_predictions = args["model_predictions"]
+    max_cropland_area = args["max_cropland_area"]
     
     # convert individual to a more maneagable numpy array
     individual_numpy = np.array(individual)
@@ -406,17 +370,25 @@ def fitness_function(individual, args) :
     
     # third fitness function is easy: it's just a sum of the surfaces used in
     # the candidate solution, so a sum of the values in the single individual
-    total_surface = np.sum(individual)
+    #total_surface = np.sum(individual)
     
-    # numerically, we subtract the mean soja production from the theoretical max,
+    # actually, we now have a better way of computing the total surface used by
+    # a candidate solution; since we have the maximum cropland area for each pixel,
+    # we can just use the sum of an element-wise multiplication between the
+    # candidate solution and the array containing the maximum cropland area per pixel
+    total_surface = np.sum(np.multiply(individual_numpy, max_cropland_area))
+    
+    # numerically, we use a negative value for the mean soja produced per year,
     # in order to transform the problem into a minimization problem
-    #fitness_values = inspyred.ec.emo.Pareto([args["max_theoretical_soja"] - mean_soja, std_soja, total_surface])
-    # NOTE new attempt, we just use a negative value
     fitness_values = inspyred.ec.emo.Pareto([-1 * mean_soja, std_soja, total_surface])
 
     return fitness_values
 
 def main() :
+    
+    # unfortunately, there are some values that we need to put hard-coded
+    # here, because I did not find a good way of putting them in the files
+    max_cropland_area_percentage_usable = 0.2 # this is the maximum surface usable, 20% of all cropland in a pixel
 
     # there are a lot of moving parts inside an EA, so some modifications will still need to be performed by hand
     # a few hard-coded values, to be changed depending on the problem
@@ -465,6 +437,10 @@ def main() :
     logger.info("Data file \"%s\" seems to include predictions for years %s..." % 
                 (args["data_file"], str(selected_columns)))
     model_predictions = df[selected_columns].values
+    
+    # from the same file, we also take the cropland area (total) and we consider
+    # the maximum usable using the hard-coded percentage defined at the beginning
+    max_cropland_area = df["cropland_area_ha"].values * max_cropland_area_percentage_usable
 
     # compute maximum theoretical production, sum everything and divide by year
     max_theoretical_soja = np.sum(model_predictions) / model_predictions.shape[1]
@@ -474,13 +450,13 @@ def main() :
 
     # also, let's initialize the ThreadPool here, so that we just pass it to the functions later
     # and we do not need to create a new one every time we start the evaluations
-    thread_pool = ThreadPool(n_threads)
+    thread_pool = ThreadPool(args["n_threads"])
     
     # TODO it could be interesting to add two "extreme" individuals to the initial
     # population: one trivial solution with all parameters at 0.0, and one with all
     # parameters at 0.2; however, we should try this AFTER regular experiments
     seed_no_surface = [0.0] * n_dimensions
-    seed_all_surface = [0.2] * n_dimensions
+    seed_all_surface = [1.0] * n_dimensions
     seeds = [seed_no_surface, seed_all_surface]
 
     # start a series of experiments, for each random seed
@@ -513,7 +489,7 @@ def main() :
                                 pop_size=population_size,
                                 num_selected=offspring_size,
                                 maximize=False,
-                                bounder=inspyred.ec.Bounder(0.0, 0.2),
+                                bounder=inspyred.ec.Bounder(0.0, 1.0),
                                 max_evaluations=max_evaluations,
                                 
                                 # parameters of the tournament selection
@@ -542,6 +518,7 @@ def main() :
                                 
                                 # used to compute the fitness
                                 model_predictions = model_predictions,
+                                max_cropland_area = max_cropland_area,
                                 max_theoretical_soja = max_theoretical_soja,
                                 )
 
