@@ -411,8 +411,9 @@ def main() :
 
     # hard-coded values
     #args["data_file"] = "../data/pred_2000_2017_avg.m.csv"
-    args["data_file"] = "../data/soybean_pred_2000_2023_avg.m_s20.csv"
-    args["log_directory"] = "2024-01-19-soja-allocation-3-objectives"
+    #args["data_file"] = "../data/soybean_pred_2000_2023_avg.m_s20.csv"
+    args["data_file"] = "../data/soybean_pred_2000_2023_pca.m.2_new_5perc.csv"
+    args["log_directory"] = "2024-01-26-soja-allocation-3-objectives"
     args["save_directory"] = args["log_directory"]
     args["population_file_name"] = "population"
     args["save_at_every_iteration"] = True # save the whole population at every iteration
@@ -440,7 +441,7 @@ def main() :
     
     # from the same file, we also take the cropland area (total) and we consider
     # the maximum usable using the hard-coded percentage defined at the beginning
-    max_cropland_area = df["cropland_area_ha"].values * max_cropland_area_percentage_usable
+    max_cropland_area = df["soybean_area"].values # actually, no, everything is already included
 
     # compute maximum theoretical production, sum everything and divide by year
     max_theoretical_soja = np.sum(model_predictions) / model_predictions.shape[1]
