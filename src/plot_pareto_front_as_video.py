@@ -21,10 +21,10 @@ def main() :
     fitness_y = "std_soja"
     
     # target directory, containing all files
-    target_directory = "soja-allocation-3-objectives"
-    pareto_front_files = [f for f in os.listdir(target_directory) if f.endswith(".csv") and f.find("archive-generation") != -1]
+    #target_directory = "soja-allocation-3-objectives"
+    #pareto_front_files = [f for f in os.listdir(target_directory) if f.endswith(".csv") and f.find("archive-generation") != -1]
     
-    target_directory = "../results/2024-01-19-soja-allocation-3-objectives"
+    target_directory = "../results/2024-01-22-soja-allocation-3-objectives"
     pareto_front_files = [f for f in os.listdir(target_directory) if f.endswith(".csv") and f.find("archive") != -1]
     
     # set cool style for figures

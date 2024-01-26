@@ -22,6 +22,13 @@ y: latitude
 mean_Ya_pred and sd_Ya_pred: mean and standard deviation of yield over the 2000-2017 period per site
 Following columns (from 2000 to 2017) are estimated annual yields.
 
+## 2024-01-26
+There might be some issues.
+
+Arguments to discuss:
+- experiments, deadline paper
+- linear programming with George
+
 ## 2023-11-30
 Multi-objective approach to the problem of soja crops allocation:
 - maximize soja production
