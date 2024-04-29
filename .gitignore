@@ -1,2 +1,10 @@
 
 *.log
+/results
+src/ffmpeg_example.mp4
+src/pareto-front-over-time.png
+src/soja_allocation_2_objectives.mp4
+src/soja_allocation_3_objectives.mp4
+/src/2023-12-20-soja-allocation-3-objectives
+/src/2024-01-19-soja-allocation-3-objectives
+src/2024-01-19-soja-allocation-3-objectives.mp4
