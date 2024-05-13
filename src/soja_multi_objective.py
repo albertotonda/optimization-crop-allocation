@@ -170,6 +170,31 @@ def generator(random, args) :
     """
     return [random.uniform(0.0, 0.1) for _ in range(0, args["n_dimensions"])]
 
+@inspyred.ec.variators.crossover
+def variator_with_strength(random, parent1, parent2, args) :
+    """
+    The basic idea of this variator is to select one between multiple possible
+    other variators (e.g. mutation or cross-over) and then apply some 
+    """
+    # get all parameters related to the mutation
+    mutation_strength = args["strength"]
+    mutation_mean = args["gaussian_mean"]
+    mutation_std = args["gaussian_std"]
+    bounder = args["_ec"].bounder
+    
+    # invoke classic n-point crossover, probability is evaluated inside
+    children = inspyred.ec.variators.n_point_crossover(random, parent1, parent2, args)
+    
+    # and now, modified mutation with strength
+    for child in children :
+        while random.random() < mutation_strength :
+            # pick random element, add Gaussian mutation
+            index = random.choice(range(0, len(child)))
+            child[index] += random.gauss(mutation_mean, mutation_std)
+        child = bounder(child, args)
+    
+    return children
+
 def best_archiver_numpy(random, population, archive, args):
     """Archive only the best individual(s).
     
@@ -207,9 +232,18 @@ def best_archiver_numpy(random, population, archive, args):
 
 def observer(population, num_generations, num_evaluations, args) :
     """
-    The observer is a classic function for inspyred, that prints out information and/or saves individuals. However, it can be easily re-used by other
-    evolutionary approaches.
+    The observer is a classic function for inspyred, that prints out information and/or saves individuals. 
+    However, it can be easily re-used by other evolutionary approaches.
+    In this particular case, we are going to test a self-adapting of the mutation
+    strength.
     """
+    # self-adapting: multiplying everything by a value < 1.0, slowly reducing
+    # both the mutation rate and the mean of the Gaussian mutation
+    decay = args["decay"]
+    args["mutation_rate"] *= decay
+    args["gaussian_mean"] *= decay
+    
+    # logging and saving the population
     logger = args["logger"]
     save_directory = args["save_directory"]
     save_at_every_iteration = args["save_at_every_iteration"]
@@ -395,13 +429,16 @@ def main() :
     population_size = int(1e3)
     offspring_size = int(2e3)
     max_evaluations = int(5e6)
+    max_generations = int(max_evaluations/offspring_size) + 1
     tournament_selection_size = int(0.02 * population_size)
 
-    mutation_rate = 0.1
+    mutation_rate = 0.5
     mutation_mean = 0.0
-    mutation_stdev = 0.1
+    mutation_stdev = 0.5
 
     crossover_rate = 0.8
+    
+    decay = 0.999
 
     # options for logging and saving files
     overwrite_save_files = False
@@ -491,7 +528,7 @@ def main() :
                                 num_selected=offspring_size,
                                 maximize=False,
                                 bounder=inspyred.ec.Bounder(0.0, 1.0),
-                                max_evaluations=max_evaluations,
+                                max_generations=max_generations,
                                 
                                 # parameters of the tournament selection
                                 tournament_size = tournament_selection_size,
