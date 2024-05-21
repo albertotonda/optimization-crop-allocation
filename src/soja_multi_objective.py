@@ -183,7 +183,7 @@ def variator_with_strength(random, parent1, parent2, args) :
     bounder = args["_ec"].bounder
     
     # invoke classic n-point crossover, probability is evaluated inside
-    children = inspyred.ec.variators.n_point_crossover(random, parent1, parent2, args)
+    children = inspyred.ec.variators.n_point_crossover(random, [parent1, parent2], args)
     
     # and now, modified mutation with strength
     for child in children :
