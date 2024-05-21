@@ -414,7 +414,7 @@ def fitness_function(individual, args) :
     
     # numerically, we use a negative value for the mean soja produced per year,
     # in order to transform the problem into a minimization problem
-    fitness_values = inspyred.ec.emo.Pareto([-1 * mean_soja, std_soja, total_surface])
+    fitness_values = inspyred.ec.emo.Pareto([-1 * mean_soja, std_soja])#, total_surface])
 
     return fitness_values
 
@@ -441,7 +441,7 @@ def main() :
     decay = 0.999
 
     # options for logging and saving files
-    overwrite_save_files = False
+    overwrite_save_files = True
     
     # relevant variables are stored in a dictionary, to ensure compatibility with inspyred
     args = dict()
@@ -449,14 +449,14 @@ def main() :
     # hard-coded values
     #args["data_file"] = "../data/pred_2000_2017_avg.m.csv"
     #args["data_file"] = "../data/soybean_pred_2000_2023_avg.m_s20.csv"
-    args["data_file"] = "../data/soybean_pred_2000_2023_pca.m.2_new_5perc.csv"
-    args["log_directory"] = "2024-01-26-soja-allocation-3-objectives"
+    args["data_file"] = "../data/soybean_pred_2000_2023_pca.m.2_new_1perc_eu27.csv"
+    args["log_directory"] = "2024-05-20-soja-allocation-2-objectives-mean-std"
     args["save_directory"] = args["log_directory"]
     args["population_file_name"] = "population"
     args["save_at_every_iteration"] = True # save the whole population at every iteration
     args["random_seeds"] = [42] # list of random seeds, because we might want to run the evolutionary algorithm in a loop 
     args["n_threads"] = 60 # TODO change number of threads 
-    fitness_names = ["mean_soja", "std_soja", "total_surface"]
+    fitness_names = ["mean_soja", "std_soja"]#, "total_surface"]
 
     # initialize logging, using a logger that smartly manages disk occupation
     logger = initialize_logging(args["log_directory"])
@@ -512,14 +512,15 @@ def main() :
         ea = inspyred.ec.emo.NSGA2(prng)
         #ea.selector = inspyred.ec.selectors.tournament_selection 
         ea.variator = [inspyred.ec.variators.n_point_crossover, inspyred.ec.variators.gaussian_mutation]
+        ea.variator = [variator_with_strength]
         #ea.replacer = inspyred.ec.replacers.plus_replacement
-        ea.terminator = inspyred.ec.terminators.evaluation_termination
+        ea.terminator = inspyred.ec.terminators.generation_termination
         ea.observer = observer
         ea.logger = args["logger"]
 
         # printout with the experimental parameters
-        logger.info("Experimental hyperparameters of NSGA-II: population size=%d, offspring size=%d, stop condition after %d evaluations, tournament selection size=%d, mutation rate=%.4f, mutation mean=%.4f, mutation stdev=%.4f, crossover rate=%.4f" % 
-                    (population_size, offspring_size, max_evaluations, tournament_selection_size, mutation_rate, mutation_mean, mutation_stdev, crossover_rate))
+        logger.info("Experimental hyperparameters of NSGA-II: population size=%d, offspring size=%d, stop condition after %d generations, tournament selection size=%d, mutation rate=%.4f, mutation mean=%.4f, mutation stdev=%.4f, crossover rate=%.4f" % 
+                    (population_size, offspring_size, max_generations, tournament_selection_size, mutation_rate, mutation_mean, mutation_stdev, crossover_rate))
 
         final_population = ea.evolve(
                                 generator=generator,
@@ -535,8 +536,11 @@ def main() :
                                 # parameters of the Gaussian mutation
                                 mutation_rate = mutation_rate, # applied as an element-by-element basis
                                 gaussian_mean = mutation_mean,
-                                gaussian_stdev = mutation_stdev, # default was 1
+                                gaussian_std = mutation_stdev, # default was 1
                                 crossover_rate = crossover_rate,
+                                # self-adapting
+                                decay = decay,
+                                strength = 0.9,
                                 
                                 # seeding: adding handcrafted individuals to the initial population
                                 #seeds = seeds,
@@ -560,6 +564,7 @@ def main() :
                                 max_theoretical_soja = max_theoretical_soja,
                                 )
 
+    logger.info("Evolution terminated!")
 
     # extract the Pareto front and plot it
     pareto_front = ea.archive
