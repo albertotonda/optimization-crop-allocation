@@ -168,7 +168,7 @@ def generator(random, args) :
     as lists, and convert them to numpy arrays when needed. This introduces an
     overhead on the computations, but it is easier than redoing everything.
     """
-    return [random.uniform(0.0, 0.1) for _ in range(0, args["n_dimensions"])]
+    return [random.uniform(0.0, 1.0) for _ in range(0, args["n_dimensions"])]
 
 @inspyred.ec.variators.crossover
 def variator_with_strength(random, parent1, parent2, args) :
