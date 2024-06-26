@@ -450,7 +450,7 @@ def main() :
     #args["data_file"] = "../data/pred_2000_2017_avg.m.csv"
     #args["data_file"] = "../data/soybean_pred_2000_2023_avg.m_s20.csv"
     args["data_file"] = "../data/soybean_pred_2000_2023_pca.m.2_new_1perc_eu27.csv"
-    args["log_directory"] = "2024-05-20-soja-allocation-2-objectives-mean-std"
+    args["log_directory"] = "2024-06-22-soja-allocation-2-objectives-mean-std-eu27"
     args["save_directory"] = args["log_directory"]
     args["population_file_name"] = "population"
     args["save_at_every_iteration"] = True # save the whole population at every iteration
