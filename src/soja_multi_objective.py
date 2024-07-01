@@ -28,145 +28,18 @@ import seaborn as sns
 import sys
 import traceback
 
-from logging.handlers import RotatingFileHandler
-from queue import Queue
-from threading import Thread, Lock
+from threading import Lock
 
-class Worker(Thread):
-    """
-    Thread executing tasks from a given tasks queue. 
-    """
-    def __init__(self, tasks, thread_id, logger=None):
-        Thread.__init__(self)
-        self.tasks = tasks
-        self.daemon = True
-        self.id = thread_id
-        self.logger = logger
-        self.start()
-
-    def run(self):
-        while True:
-            # extract arguments and organize them properly
-            func, args, kargs = self.tasks.get()
-            if self.logger :
-                self.logger.debug("[Thread %d] Args retrieved: \"%s\"" % (self.id, args))
-            new_args = []
-            if self.logger :
-                self.logger.debug("[Thread %d] Length of args: %d" % (self.id, len(args)))
-            for a in args[0]:
-                new_args.append(a)
-            new_args.append(self.id)
-            if self.logger :
-                self.logger.debug("[Thread %d] Length of new_args: %d" % (self.id, len(new_args)))
-            try:
-                # call the function with the arguments previously extracted
-                func(*new_args, **kargs)
-            except Exception as e:
-                # an exception happened in this thread
-                if self.logger :
-                    self.logger.error(traceback.format_exc())
-                else :
-                    print(traceback.format_exc())
-            finally:
-                # mark this task as done, whether an exception happened or not
-                if self.logger :
-                    self.logger.debug("[Thread %d] Task completed." % self.id)
-                self.tasks.task_done()
-
-        return
-
-class ThreadPool:
-    """
-    Pool of threads consuming tasks from a queue.
-    """
-    def __init__(self, num_threads):
-        self.tasks = Queue(num_threads)
-        for i in range(num_threads):
-            Worker(self.tasks, i)
-
-    def add_task(self, func, *args, **kargs):
-        """ Add a task to the queue """
-        self.tasks.put((func, args, kargs))
-        return
-
-    def map(self, func, args_list):
-        """ Add a list of tasks to the queue """
-        for args in args_list:
-            self.add_task(func, args)
-        return
-
-    def wait_completion(self):
-        """ Wait for completion of all the tasks in the queue """
-        self.tasks.join()
-        return
-
-
-def initialize_logging(path: str, log_name: str = "", date: bool = True) -> logging.Logger :
-    """
-    Function that initializes the logger, opening one (DEBUG level) for a file and one (INFO level) for the screen printouts.
-    """
-
-    if date:
-        log_name = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "-" + log_name
-    log_name = os.path.join(path, log_name + ".log")
-
-    # create log folder if it does not exists
-    if not os.path.isdir(path):
-        os.mkdir(path)
-
-    # remove old logger if it exists
-    if os.path.exists(log_name):
-        os.remove(log_name)
-
-    # create an additional logger
-    logger = logging.getLogger(log_name)
-
-    # format log file
-    logger.setLevel(logging.DEBUG)
-    formatter = logging.Formatter("[%(levelname)s %(asctime)s] %(message)s",
-                                  "%Y-%m-%d %H:%M:%S")
-
-    # the 'RotatingFileHandler' object implements a log file that is automatically limited in size
-    fh = RotatingFileHandler(log_name,
-                             mode='a',
-                             maxBytes=100*1024*1024,
-                             backupCount=2,
-                             encoding=None,
-                             delay=0)
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-
-    logger.info("Starting " + log_name + "!")
-
-    return logger
-
-
-def close_logging(logger: logging.Logger) :
-    """
-    Simple function that properly closes the logger, avoiding issues when the program ends.
-    """
-
-    for handler in logger.handlers:
-        handler.close()
-        logger.removeHandler(handler)
-
-    return
+# local library with utility functions, refactoring to clean up the code a bit
+from local_utility import ThreadPool, initialize_logging, close_logging
 
 
 def generator(random, args) :
     """
-    Generator function exploits numpy's instance of a pseudo-random number generator
-    to create an array of random numbers in range (min, max) with the correct shape;
-    TODO nope, when candidates are pure numpy arrays it creates several issues at
-    the level of the internal comparisions, so I decided to create individuals
-    as lists, and convert them to numpy arrays when needed. This introduces an
-    overhead on the computations, but it is easier than redoing everything.
+    Generator function creates an array of random numbers in range (min, max) 
+    with the correct shape; individuals are created as lists, and converted 
+    to numpy arrays when needed. This introduces an overhead on the computations,
+    but it is easier.
     """
     return [random.uniform(0.0, 1.0) for _ in range(0, args["n_dimensions"])]
 
@@ -195,41 +68,6 @@ def variator_with_strength(random, parent1, parent2, args) :
     
     return children
 
-def best_archiver_numpy(random, population, archive, args):
-    """Archive only the best individual(s).
-    
-    This function is basically a copy of 'best_archiver', but it is modified
-    to work with individuals that are numpy arrays.
-    
-    .. Arguments:
-       random -- the random number generator object
-       population -- the population of individuals
-       archive -- the current archive of individuals
-       args -- a dictionary of keyword arguments
-    
-    """
-    new_archive = archive
-    for ind in population:
-        if len(new_archive) == 0:
-            new_archive.append(ind)
-        else:
-            should_remove = []
-            should_add = True
-            for a in new_archive:
-                #if ind.candidate == a.candidate:
-                if np.array_equal(ind.candidate, a.candidate):
-                    should_add = False
-                    break
-                elif ind < a:
-                    should_add = False
-                elif ind > a:
-                    should_remove.append(a)
-            for r in should_remove:
-                new_archive.remove(r)
-            if should_add:
-                new_archive.append(ind)
-    return new_archive
-
 def observer(population, num_generations, num_evaluations, args) :
     """
     The observer is a classic function for inspyred, that prints out information and/or saves individuals. 
@@ -239,9 +77,9 @@ def observer(population, num_generations, num_evaluations, args) :
     """
     # self-adapting: multiplying everything by a value < 1.0, slowly reducing
     # both the mutation rate and the mean of the Gaussian mutation
-    decay = args["decay"]
-    args["mutation_rate"] *= decay
-    args["gaussian_mean"] *= decay
+    #decay = args["decay"]
+    #args["mutation_rate"] *= decay
+    #args["gaussian_mean"] *= decay
     
     # logging and saving the population
     logger = args["logger"]
@@ -422,17 +260,23 @@ def main() :
     
     # unfortunately, there are some values that we need to put hard-coded
     # here, because I did not find a good way of putting them in the files
-    max_cropland_area_percentage_usable = 0.2 # this is the maximum surface usable, 20% of all cropland in a pixel
 
     # there are a lot of moving parts inside an EA, so some modifications will still need to be performed by hand
     # a few hard-coded values, to be changed depending on the problem
-    population_size = int(1e3)
-    offspring_size = int(2e3)
-    max_evaluations = int(5e6)
+    population_size = int(1e2)
+    offspring_size = int(2e2)
+    max_evaluations = int(5e5)
     max_generations = int(max_evaluations/offspring_size) + 1
-    tournament_selection_size = int(0.02 * population_size)
+    
+    
+    # another set of parameters
+    population_size = 6000
+    offspring_size = 12000
+    max_generations = 100
 
-    mutation_rate = 0.5
+    tournament_selection_size = int(0.02 * population_size)
+    
+    mutation_rate = 0.1
     mutation_mean = 0.0
     mutation_stdev = 0.5
 
@@ -450,7 +294,7 @@ def main() :
     #args["data_file"] = "../data/pred_2000_2017_avg.m.csv"
     #args["data_file"] = "../data/soybean_pred_2000_2023_avg.m_s20.csv"
     args["data_file"] = "../data/soybean_pred_2000_2023_pca.m.2_new_1perc_eu27.csv"
-    args["log_directory"] = "2024-06-22-soja-allocation-2-objectives-mean-std-eu27"
+    args["log_directory"] = "2024-06-27-soja-allocation-2-objectives-mean-std-eu27"
     args["save_directory"] = args["log_directory"]
     args["population_file_name"] = "population"
     args["save_at_every_iteration"] = True # save the whole population at every iteration
@@ -510,10 +354,8 @@ def main() :
         # create an instance of EvolutionaryComputation (generic EA) and set up its parameters
         # define all parts of the evolutionary algorithm (mutation, selection, etc., including observer)
         ea = inspyred.ec.emo.NSGA2(prng)
-        #ea.selector = inspyred.ec.selectors.tournament_selection 
         ea.variator = [inspyred.ec.variators.n_point_crossover, inspyred.ec.variators.gaussian_mutation]
-        ea.variator = [variator_with_strength]
-        #ea.replacer = inspyred.ec.replacers.plus_replacement
+        ea.variator = [inspyred.ec.variators.n_point_crossover, inspyred.ec.variators.nonuniform_mutation]
         ea.terminator = inspyred.ec.terminators.generation_termination
         ea.observer = observer
         ea.logger = args["logger"]
@@ -534,13 +376,13 @@ def main() :
                                 # parameters of the tournament selection
                                 tournament_size = tournament_selection_size,
                                 # parameters of the Gaussian mutation
-                                mutation_rate = mutation_rate, # applied as an element-by-element basis
-                                gaussian_mean = mutation_mean,
-                                gaussian_std = mutation_stdev, # default was 1
+                                #mutation_rate = mutation_rate, # applied as an element-by-element basis
+                                #gaussian_mean = mutation_mean,
+                                #gaussian_std = mutation_stdev, # default was 1
                                 crossover_rate = crossover_rate,
                                 # self-adapting
-                                decay = decay,
-                                strength = 0.9,
+                                #decay = decay,
+                                #strength = 0.9,
                                 
                                 # seeding: adding handcrafted individuals to the initial population
                                 #seeds = seeds,
