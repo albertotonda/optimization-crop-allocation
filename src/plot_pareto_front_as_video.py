@@ -21,11 +21,10 @@ def main() :
     fitness_y = "std_soja"
     
     # target directory, containing all files
-    #target_directory = "soja-allocation-3-objectives"
-    #pareto_front_files = [f for f in os.listdir(target_directory) if f.endswith(".csv") and f.find("archive-generation") != -1]
-    
-    target_directory = "../results/2024-01-22-soja-allocation-3-objectives"
-    pareto_front_files = [f for f in os.listdir(target_directory) if f.endswith(".csv") and f.find("archive") != -1]
+    #target_directory = "../results/2024-01-22-soja-allocation-3-objectives"
+    target_directory = "2024-07-20-soja-allocation-2-objectives-mean-std-eu27"
+    pareto_front_files = [os.path.join(target_directory, f) for f in os.listdir(target_directory) 
+                          if f.endswith(".csv") and f.find("archive") != -1 and f.find("generation") != -1]
     
     # set cool style for figures
     sns.set_style(style='darkgrid')
@@ -34,7 +33,9 @@ def main() :
     
     # now we need some parsing magic to actually sort the files by number and
     # not alphabetically, otherwise we get a sequence like 1 - 10 - 100 - 1000 - 1001 - 1002...
-    regular_expression = "\-([0-9]+)[\-|\.]" # captures any integer
+    #regular_expression = "\-([0-9]+)[\-|\.]" # captures any integer
+    # the above regular expression was too sophisticated, let's try something better
+    regular_expression = "generation\-([0-9]+)"
     id_and_file = [ [int(regex.search(regular_expression, f).group(1)), f] for f in pareto_front_files]
     id_and_file = sorted(id_and_file, key=lambda x : x[0])
     
@@ -42,7 +43,7 @@ def main() :
     
     # before starting the plotting, we need to get the smallest values for each
     # fitness value, likely in the last file (as this is a minimization problem)
-    df = pd.read_csv(os.path.join(target_directory, id_and_file[-1][1]))
+    df = pd.read_csv(id_and_file[-1][1])
     x_smallest = df[fitness_x].values.min()
     y_smallest = df[fitness_y].values.min()
     # actually, maybe all values (min and max) should be taken from just the last file,
@@ -74,7 +75,7 @@ def main() :
     def update(frame, ax=ax, id_and_file=id_and_file, pareto_front=pareto_front) :
         
         file_name = id_and_file[frame][1]
-        df = pd.read_csv(os.path.join(target_directory, file_name))
+        df = pd.read_csv(file_name)
         
         print("Now updating plot with file \"%s\"..." % file_name)
         

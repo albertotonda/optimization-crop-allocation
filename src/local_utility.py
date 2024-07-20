@@ -7,6 +7,7 @@ Created on Thu Jun 27 11:53:05 2024
 
 import datetime
 import logging
+import numpy as np
 import os
 
 from logging.handlers import RotatingFileHandler
@@ -138,3 +139,46 @@ def close_logging(logger: logging.Logger) :
         logger.removeHandler(handler)
 
     return
+
+def fitness_function(individual, args) : 
+    """
+    This is the fitness function. It has been isolated from inspyred's version
+    in order to re-use it for other algorithms without changing the code.
+    """
+    # load data
+    model_predictions = args["model_predictions"]
+    max_cropland_area = args["max_cropland_area"]
+    
+    # convert individual to a more maneagable numpy array
+    individual_numpy = np.array(individual)
+
+    # first fitness function is the total soja produced over the years;
+    # second fitness function is the standard deviation inter-year;
+    # for this reason, it's better to first compute the year-by-year production
+    production_by_year = np.zeros((model_predictions.shape[1],))
+    
+    for year in range(0, model_predictions.shape[1]) :
+        
+        # select column of data corresponding to a year
+        model_predictions_year = model_predictions[:, year]
+        
+        # multiply, element-wise, each element of the candidate solution with
+        # the predicted production for the corresponding square for that year
+        production_by_year[year] = np.sum(np.multiply(individual_numpy, model_predictions_year))
+    
+    # now that we have the production by year, we can easily compute the first
+    # and second fitness values
+    mean_soja = np.mean(production_by_year)
+    std_soja = np.std(production_by_year)
+    
+    # third fitness function is easy: it's just a sum of the surfaces used in
+    # the candidate solution, so a sum of the values in the single individual
+    #total_surface = np.sum(individual)
+    
+    # actually, we now have a better way of computing the total surface used by
+    # a candidate solution; since we have the maximum cropland area for each pixel,
+    # we can just use the sum of an element-wise multiplication between the
+    # candidate solution and the array containing the maximum cropland area per pixel
+    total_surface = np.sum(np.multiply(individual_numpy, max_cropland_area))
+    
+    return mean_soja, std_soja, total_surface

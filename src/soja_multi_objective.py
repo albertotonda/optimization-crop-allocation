@@ -31,7 +31,7 @@ import traceback
 from threading import Lock
 
 # local library with utility functions, refactoring to clean up the code a bit
-from local_utility import ThreadPool, initialize_logging, close_logging
+from local_utility import ThreadPool, fitness_function, initialize_logging, close_logging
 
 
 def generator(random, args) :
@@ -203,57 +203,43 @@ def evaluate_individual(individual, args, index, fitness_list, thread_lock, thre
     # thread_lock is a threading.Lock object used for synchronization and avoiding
     # writing on the same resource from multiple threads at the same time
     thread_lock.acquire()
-    fitness_list[index] = fitness_function(individual, args) # TODO put your evaluation function here, also maybe add logger and thread_id 
+    fitness_list[index] = fitness_function_inspyred(individual, args) # TODO put your evaluation function here, also maybe add logger and thread_id 
     thread_lock.release()
 
     logger.debug("[Thread %d] Evaluation finished." % thread_id)
 
     return
 
-def fitness_function(individual, args) : 
+def fitness_function_inspyred(individual, args) :
     """
-    This is the fitness function. It should be replaced by the 'true' fitness function to be optimized.
+    This is the fitness function for inspyred. It's a wrapper because I decided
+    to de-couple the fitness computation from the algorithm, in order to re-use
+    the same fitness computation for different algorithms, without changing
+    the core computations.
     """
-    # load data
-    model_predictions = args["model_predictions"]
-    max_cropland_area = args["max_cropland_area"]
+    # if no fitness name has been specified, we default to using all three objectives
+    fitness_names = args.get("fitness_names", ["mean_soja", "std_soja", "total_surface"])
     
-    # convert individual to a more maneagable numpy array
-    individual_numpy = np.array(individual)
-
-    # first fitness function is the total soja produced over the years;
-    # second fitness function is the standard deviation inter-year;
-    # for this reason, it's better to first compute the year-by-year production
-    production_by_year = np.zeros((model_predictions.shape[1],))
+    mean_soja, std_soja, total_surface = fitness_function(individual, args)
     
-    for year in range(0, model_predictions.shape[1]) :
-        
-        # select column of data corresponding to a year
-        model_predictions_year = model_predictions[:, year]
-        
-        # multiply, element-wise, each element of the candidate solution with
-        # the predicted production for the corresponding square for that year
-        production_by_year[year] = np.sum(np.multiply(individual_numpy, model_predictions_year))
+    # check the fitness names that are actually requested
+    fitness_values_list = []
+    for fitness_name in fitness_names :
+        if fitness_name == "mean_soja" :
+            # numerically, we use a negative value for the mean soja produced per year,
+            # in order to transform the problem into a minimization problem
+            fitness_values_list.append(-1.0 * mean_soja)
+        elif fitness_name == "std_soja" :
+            # this is already correct for minimization, so we just use it as it is
+            fitness_values_list.append(std_soja)
+        elif fitness_name == "total_surface" :
+            # same goes for this one
+            fitness_values_list.append(total_surface)
     
-    # now that we have the production by year, we can easily compute the first
-    # and second fitness values
-    mean_soja = np.mean(production_by_year)
-    std_soja = np.std(production_by_year)
+    # prepare values in the format that is correct for inspyred, a Pareto object
+    # initialized with a list of values
+    fitness_values = inspyred.ec.emo.Pareto(fitness_values_list)
     
-    # third fitness function is easy: it's just a sum of the surfaces used in
-    # the candidate solution, so a sum of the values in the single individual
-    #total_surface = np.sum(individual)
-    
-    # actually, we now have a better way of computing the total surface used by
-    # a candidate solution; since we have the maximum cropland area for each pixel,
-    # we can just use the sum of an element-wise multiplication between the
-    # candidate solution and the array containing the maximum cropland area per pixel
-    total_surface = np.sum(np.multiply(individual_numpy, max_cropland_area))
-    
-    # numerically, we use a negative value for the mean soja produced per year,
-    # in order to transform the problem into a minimization problem
-    fitness_values = inspyred.ec.emo.Pareto([-1 * mean_soja, std_soja])#, total_surface])
-
     return fitness_values
 
 def main() :
@@ -265,27 +251,16 @@ def main() :
     # a few hard-coded values, to be changed depending on the problem
     population_size = int(1e2)
     offspring_size = int(2e2)
-    max_evaluations = int(5e5)
+    max_evaluations = int(1e4)
     max_generations = int(max_evaluations/offspring_size) + 1
-    
-    
-    # another set of parameters
-    population_size = 6000
-    offspring_size = 12000
-    max_generations = 100
-
     tournament_selection_size = int(0.02 * population_size)
     
-    mutation_rate = 0.1
-    mutation_mean = 0.0
-    mutation_stdev = 0.5
-
-    crossover_rate = 0.8
+    # TODO add here some extra option for the evolutionary operators
     
-    decay = 0.999
-
-    # options for logging and saving files
-    overwrite_save_files = True
+    # options for logging and saving files; setting overwrite to True will result
+    # in a single file with the individuals at the end of the run; setting it to
+    # False will create a separate file with population and archive at each generation
+    overwrite_save_files = False
     
     # relevant variables are stored in a dictionary, to ensure compatibility with inspyred
     args = dict()
@@ -293,8 +268,9 @@ def main() :
     # hard-coded values
     #args["data_file"] = "../data/pred_2000_2017_avg.m.csv"
     #args["data_file"] = "../data/soybean_pred_2000_2023_avg.m_s20.csv"
-    args["data_file"] = "../data/soybean_pred_2000_2023_pca.m.2_new_1perc_eu27.csv"
-    args["log_directory"] = "2024-06-27-soja-allocation-2-objectives-mean-std-eu27"
+    #args["data_file"] = "../data/soybean_pred_2000_2023_pca.m.2_new_1perc_eu27.csv"
+    args["data_file"] = "../data/A_preds_eu27.csv"
+    args["log_directory"] = "2024-07-20-soja-allocation-2-objectives-mean-std-eu27"
     args["save_directory"] = args["log_directory"]
     args["population_file_name"] = "population"
     args["save_at_every_iteration"] = True # save the whole population at every iteration
@@ -339,7 +315,7 @@ def main() :
     # parameters at 0.2; however, we should try this AFTER regular experiments
     seed_no_surface = [0.0] * n_dimensions
     seed_all_surface = [1.0] * n_dimensions
-    seeds = [seed_no_surface, seed_all_surface]
+    #seeds = [seed_no_surface, seed_all_surface]
 
     # start a series of experiments, for each random seed
     for random_seed in args["random_seeds"] :
@@ -361,8 +337,8 @@ def main() :
         ea.logger = args["logger"]
 
         # printout with the experimental parameters
-        logger.info("Experimental hyperparameters of NSGA-II: population size=%d, offspring size=%d, stop condition after %d generations, tournament selection size=%d, mutation rate=%.4f, mutation mean=%.4f, mutation stdev=%.4f, crossover rate=%.4f" % 
-                    (population_size, offspring_size, max_generations, tournament_selection_size, mutation_rate, mutation_mean, mutation_stdev, crossover_rate))
+        #logger.info("Experimental hyperparameters of NSGA-II: population size=%d, offspring size=%d, stop condition after %d generations, tournament selection size=%d, mutation rate=%.4f, mutation mean=%.4f, mutation stdev=%.4f, crossover rate=%.4f" % 
+        #            (population_size, offspring_size, max_generations, tournament_selection_size, mutation_rate, mutation_mean, mutation_stdev, crossover_rate))
 
         final_population = ea.evolve(
                                 generator=generator,
@@ -379,7 +355,7 @@ def main() :
                                 #mutation_rate = mutation_rate, # applied as an element-by-element basis
                                 #gaussian_mean = mutation_mean,
                                 #gaussian_std = mutation_stdev, # default was 1
-                                crossover_rate = crossover_rate,
+                                #crossover_rate = crossover_rate,
                                 # self-adapting
                                 #decay = decay,
                                 #strength = 0.9,
@@ -411,50 +387,55 @@ def main() :
     # extract the Pareto front and plot it
     pareto_front = ea.archive
     
-    mean_soja_values = [individual.fitness[0] for individual in pareto_front]
-    std_soja_values = [individual.fitness[1] for individual in pareto_front]
-    total_surface_values = [individual.fitness[2] for individual in pareto_front]
+    mean_soja_values = std_soja_values = total_surface_values = None
+    for fitness_name in fitness_names :
+        if fitness_name == "mean_soja" :
+            mean_soja_values = [individual.fitness[0] for individual in pareto_front]
+        elif fitness_name == "std_soja" :
+            std_soja_values = [individual.fitness[1] for individual in pareto_front]
+        elif fitness_name == "total_surface" :
+            total_surface_values = [individual.fitness[2] for individual in pareto_front]
     
     sns.set_style('darkgrid')
     
-    fig = plt.figure(figsize=(10,8))
-    ax = fig.add_subplot(projection='3d')
-    ax.scatter(mean_soja_values, std_soja_values, total_surface_values, alpha=0.7)
-    ax.set_title("Pareto front in 3D")
-    ax.set_xlabel(fitness_names[0])
-    ax.set_ylabel(fitness_names[1])
-    ax.set_zlabel(fitness_names[2])
-    plt.savefig(os.path.join(args["save_directory"], "pareto-front-3d.png"), dpi=300)
-    plt.show()
-    plt.close(fig)
+    if mean_soja_values is not None and std_soja_values is not None and total_surface_values is not None :
+        fig = plt.figure(figsize=(10,8))
+        ax = fig.add_subplot(projection='3d')
+        ax.scatter(mean_soja_values, std_soja_values, total_surface_values, alpha=0.7)
+        ax.set_title("Pareto front in 3D")
+        ax.set_xlabel(fitness_names[0])
+        ax.set_ylabel(fitness_names[1])
+        ax.set_zlabel(fitness_names[2])
+        plt.savefig(os.path.join(args["save_directory"], "pareto-front-3d.png"), dpi=300)
+        plt.show()
+        plt.close(fig)
     
-    # also plot 2D projections of the plots
-    fig = plt.figure(figsize=(10,8))
-    ax = fig.add_subplot(111)
-    sns.scatterplot(x=mean_soja_values, y=std_soja_values, alpha=0.7)
-    ax.set_title("2D projection of the Pareto front")
-    ax.set_xlabel(fitness_names[0])
-    ax.set_ylabel(fitness_names[1])
-    # we also change the labels for the 'x' axis, trying to go back to the actual production
-    #labels = [item.get_text() for item in ax.get_xticklabels()]
-    #new_labels = ["%.2e" % (max_theoretical_soja - float(label)) for label in labels]
-    #ax.set_xticklabels(new_labels)
-    plt.savefig(os.path.join(args["save_directory"], "pareto-front-%s-%s.png" % (fitness_names[0], fitness_names[1])), dpi=300)
-    plt.close(fig)
-
-    # another 2D projection
-    fig = plt.figure(figsize=(10,8))
-    ax = fig.add_subplot(111)
-    sns.scatterplot(x=mean_soja_values, y=total_surface_values, alpha=0.7)
-    ax.set_title("2D projection of the Pareto front")
-    ax.set_xlabel(fitness_names[0])
-    ax.set_ylabel(fitness_names[2])
-    # we also change the labels for the 'x' axis, trying to go back to the actual production
-    #labels = [item.get_text() for item in ax.get_xticklabels()]
-    #new_labels = ["%.2e" % (max_theoretical_soja - float(label)) for label in labels]
-    #ax.set_xticklabels(new_labels)
-    plt.savefig(os.path.join(args["save_directory"], "pareto-front-%s-%s.png" % (fitness_names[0], fitness_names[2])), dpi=300)
-    plt.close(fig)
+    else :
+        
+        fitness_0_values = fitness_1_values = None
+        if "mean_soja" in fitness_names :
+            fitness_0_values = mean_soja_values
+        else :
+            fitness_0_values = std_soja_values
+            
+        if "total_surface" in fitness_names :
+            fitness_1_values = total_surface_values
+        else :
+            fitness_1_values = std_soja_values
+        
+        # also plot 2D projections of the plots
+        fig = plt.figure(figsize=(10,8))
+        ax = fig.add_subplot(111)
+        sns.scatterplot(x=fitness_0_values, y=fitness_1_values, alpha=0.7)
+        ax.set_title("2D projection of the Pareto front")
+        ax.set_xlabel(fitness_names[0])
+        ax.set_ylabel(fitness_names[1])
+        # we also change the labels for the 'x' axis, trying to go back to the actual production
+        #labels = [item.get_text() for item in ax.get_xticklabels()]
+        #new_labels = ["%.2e" % (max_theoretical_soja - float(label)) for label in labels]
+        #ax.set_xticklabels(new_labels)
+        plt.savefig(os.path.join(args["save_directory"], "pareto-front-%s-%s.png" % (fitness_names[0], fitness_names[1])), dpi=300)
+        plt.close(fig)
 
     # save final archive (Pareto front) to csv
     save_population_to_csv(pareto_front, ea.num_generations, os.path.join(args["save_directory"], "final-pareto-front.csv"), fitness_names)
