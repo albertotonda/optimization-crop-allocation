@@ -22,7 +22,7 @@ def main() :
     
     # target directory, containing all files
     #target_directory = "../results/2024-01-22-soja-allocation-3-objectives"
-    target_directory = "2024-07-20-soja-allocation-2-objectives-mean-std-eu27"
+    target_directory = "2024-07-20-soja-allocation-2-objectives-mean-std-eu27-b"
     pareto_front_files = [os.path.join(target_directory, f) for f in os.listdir(target_directory) 
                           if f.endswith(".csv") and f.find("archive") != -1 and f.find("generation") != -1]
     

@@ -251,7 +251,7 @@ def main() :
     # a few hard-coded values, to be changed depending on the problem
     population_size = int(1e2)
     offspring_size = int(2e2)
-    max_evaluations = int(1e4)
+    max_evaluations = int(1e5)
     max_generations = int(max_evaluations/offspring_size) + 1
     tournament_selection_size = int(0.02 * population_size)
     
@@ -270,7 +270,7 @@ def main() :
     #args["data_file"] = "../data/soybean_pred_2000_2023_avg.m_s20.csv"
     #args["data_file"] = "../data/soybean_pred_2000_2023_pca.m.2_new_1perc_eu27.csv"
     args["data_file"] = "../data/A_preds_eu27.csv"
-    args["log_directory"] = "2024-07-20-soja-allocation-2-objectives-mean-std-eu27"
+    args["log_directory"] = "2024-07-20-soja-allocation-2-objectives-mean-std-eu27-b"
     args["save_directory"] = args["log_directory"]
     args["population_file_name"] = "population"
     args["save_at_every_iteration"] = True # save the whole population at every iteration
