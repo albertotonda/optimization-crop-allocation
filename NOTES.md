@@ -1,8 +1,19 @@
 # Multi-objective optimization of crop allocation
-Repository for the project with David Makowski and Mathilde Chen.
+Repository for the project with Mathilde Chen, David Makowski and Georgios Katsirelos.
 
 ## Summary
 We have crop yields (predicted or recorded/detrended) for several years, in a time series, for several adjacent regions. In the most recent case, soy allocation.
+
+## Links to Google Drive
+[General folder] 
+[Experimental plan] https://docs.google.com/document/d/1rOV_k2apjmq_Z5UWfzW9ISwiRqY4oppb5GHv_Svkq2g/edit?usp=sharing
+[Folders with results]
+
+## TODO
+1. Compare Pareto fronts of 2- and 3-objective runs. What are the best solutions found?
+2. What happens if we inject the two "best" solutions as seeds?
+3. Idea: use CMA-ES with varying weights, multiple times, to find points on the Pareto front.
+4. Otherwise, MOEA/D.
 
 ## Data
 Soybean yield predictions in Europe over 2000-2017 period, following 2 hypotheses:
@@ -34,10 +45,6 @@ Multi-objective approach to the problem of soja crops allocation:
 - maximize soja production
 - minimize inter-year variance
 - minimize surface
-
-## TODO
-1. Compare Pareto fronts of 2- and 3-objective runs. What are the best solutions found?
-2. What happens if we inject the two "best" solutions as seeds?
 
 ## Links to data and/or papers
 https://doi.org/10.6084/m9.figshare.11903277
