@@ -31,10 +31,13 @@ def fitness_function_cmaes(individual, args) :
     # if a fitness name is not found in the dictionary, the weight will be 0.0
     fitness_value = 0.0
     
-    # mean_soja has to be multiplied by -1, in order to minimize the sum
-    fitness_value += weights_dictionary.get("mean_soja", 0.0) * (-1) * mean_soja 
-    fitness_value += weights_dictionary.get("std_soja", 0.0) * std_soja 
-    fitness_value += weights_dictionary.get("total_surface", 0.0) * total_surface
+    # mean_soja has to be multiplied by -1, in order to minimize the sum; also,
+    # all values need to be normalized, so that the relative weights have the same meaning;
+    # but now that we have the maximum amount that can be produced, we can put everything positive
+    # by setting the production objective to (max_soja - mean_soja) / max_soja
+    fitness_value += weights_dictionary.get("mean_soja", 0.0) * (args["max_soja"] - mean_soja) / args["max_soja"]
+    fitness_value += weights_dictionary.get("std_soja", 0.0) * std_soja / args["max_std_soja"]
+    fitness_value += weights_dictionary.get("total_surface", 0.0) * total_surface / args["max_total_surface"]
     
     return fitness_value
 
@@ -48,7 +51,8 @@ def generate_weights(number_of_objectives=3, parts=10) :
     
     weights = []
     current_weights = []
-    steps = [round(step_size * i, 3) for i in range(1, parts-number_of_objectives+2)]
+    steps = [round(step_size * i, 3) for i in range(0, parts+1)]
+    print(steps)
     depth = 1
     max_depth = number_of_objectives
     
@@ -72,7 +76,7 @@ def recursive_generate_weights(weights, current_weights, steps, depth, max_depth
     else :
         # take a look at the sum of the current weights, and select all steps
         # that would make the sum LESS THAN ONE (if max_depth is not reached)
-        selected_steps = [s for s in steps if sum(current_weights) + s < 1.0]
+        selected_steps = [s for s in steps if sum(current_weights) + s <= 1.0]
         
         # call the recursive function, adding the step to the current weights
         for s in selected_steps :
@@ -91,13 +95,14 @@ def main() :
     save_directory = "2024-07-20-soja-cma-es"
     results_file = os.path.join(save_directory, "results.csv")
     fitness_names = ["mean_soja", "std_soja"]
-    weight_parts = 100
+    weight_parts = 10
     
     # we are decomposing the problem into a number of separate single-objective problems
     fitness_weights = generate_weights(number_of_objectives=len(fitness_names), parts=weight_parts)
+    #fitness_weights = [[1.0, 0.0]] # TODO comment this, it's just for debugging
     
     max_evaluations = 1e5
-    sigma0 = 1e-2
+    sigma0 = 5e-2
     
     individual_minimum = 0.0
     individual_maximum = 1.0
@@ -116,7 +121,7 @@ def main() :
     # from the same file, we also take the cropland area (total) and we consider
     # the maximum usable using the hard-coded percentage defined at the beginning
     max_cropland_area = df["soybean_area"].values
-    
+        
     # get number of dimensions based on the file
     individual_size = model_predictions.shape[0] 
     
@@ -124,6 +129,14 @@ def main() :
     args["fitness_names"] = fitness_names
     args["model_predictions"] = model_predictions
     args["max_cropland_area"] = max_cropland_area
+    
+    # also get maximum production and maximum standard deviation by setting all
+    # values to 1.0
+    maximized_individual = [1.0] * individual_size
+    max_soja, max_std_soja, max_total_surface = fitness_function(maximized_individual, args)
+    args["max_soja"] = max_soja
+    args["max_std_soja"] = max_std_soja
+    args["max_total_surface"] = max_total_surface
     
     # set up cma-es
     x0 = [(individual_maximum - individual_minimum) / 2] * individual_size
