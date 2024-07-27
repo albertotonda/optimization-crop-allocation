@@ -52,7 +52,6 @@ def generate_weights(number_of_objectives=3, parts=10) :
     weights = []
     current_weights = []
     steps = [round(step_size * i, 3) for i in range(0, parts+1)]
-    print(steps)
     depth = 1
     max_depth = number_of_objectives
     
