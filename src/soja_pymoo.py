@@ -77,7 +77,7 @@ def main() :
     # hard-coded values
     random_seed = 42
     data_file = "../data/A_preds_eu27.csv"
-    results_file = "results.csv"
+    results_base_file_name = "results.csv"
     fitness_names = ["mean_soja", "std_soja", "total_surface"]
     fitness_names = ["mean_soja", "std_soja"]
     n_objectives = len(fitness_names)
@@ -157,9 +157,18 @@ def main() :
             results_dictionary["std_soja"][i] = std_soja
         if "total_surface" in results_dictionary :
             results_dictionary["total_surface"][i] = total_surface
+            
+    # let's also create a results file with a specific name, to remember the settings
+    results_file_name = datetime.datetime.now().strftime("%Y-%m-%d-") 
+    results_file_name += "-".join(fitness_names) + "-" + algorithm_class.__name__ + "-"
+    if algorithm_class is MOEAD :
+        results_file_name += "partitions%d-neighbors%d-probmating%.2f-" % (n_partitions, n_neighbors, prob_neighbor_mating)
+    elif algorithm_class is NSGA2 :
+        results_file_name += "mu%d-" % (population_size)
+    results_file_name += results_base_file_name
     
     df_results = pd.DataFrame.from_dict(results_dictionary)
-    df_results.to_csv(os.path.join(results_folder, results_file), index=False)
+    df_results.to_csv(os.path.join(results_folder, results_file_name), index=False)
     
     return
 
