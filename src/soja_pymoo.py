@@ -17,6 +17,7 @@ from pymoo.algorithms.moo.moead import MOEAD
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
+from pymoo.termination.default import DefaultMultiObjectiveTermination
 from pymoo.util.ref_dirs import get_reference_directions 
 
 # local package, containing the fitness function that returns the three separate
@@ -83,12 +84,23 @@ def main() :
     n_objectives = len(fitness_names)
     algorithm_class = MOEAD # it can also be NSGA2
     
-    # hyperparameters for MOEA/D
+    # hyperparameters for MOEA/D and NSGA2
     population_size = 500
     max_generations = 100
     n_partitions = 1000
     n_neighbors = 15
     prob_neighbor_mating = 0.7
+    
+    # this is a more proper termination check, with several conditions; it stops
+    # when one of the conditions is satisfied
+    termination = DefaultMultiObjectiveTermination(
+        xtol=1e-8,
+        cvtol=1e-6,
+        ftol=0.0025,
+        period=30,
+        n_max_gen=max_generations,
+        n_max_evals=max_generations * population_size
+        )
     
     # create folder for the results
     results_folder = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S-") + "-".join(fitness_names) + "-" + algorithm_class.__name__
@@ -114,10 +126,12 @@ def main() :
                                     {"model_predictions" : model_predictions,
                                      "max_cropland_area" : max_cropland_area})
     
+    # initialize the problem instance with all the information gathered so far
     problem = MultiObjectiveSojaProblem(n_variables, fitness_names, 
                                         model_predictions, max_cropland_area, 
                                         max_soja_production)
     
+    # set up the algorithm, depending on the class selected
     algorithm = None
     if algorithm_class is MOEAD :
         # set up the algorithm, with the reference directions
@@ -128,7 +142,12 @@ def main() :
         algorithm = algorithm_class(pop_size=population_size)
     
     # start the run
-    result = minimize(problem, algorithm, ('n_gen', max_generations), seed=random_seed, verbose=True)
+    result = minimize(problem, 
+                      algorithm, 
+                      termination, 
+                      ('n_gen', max_generations), 
+                      seed=random_seed, 
+                      verbose=True)
     
     # do something with the results! ideally, it would be nice to save them
     # result.X contains the genotype of the final non-dominated solutions
