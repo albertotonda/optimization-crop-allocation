@@ -77,16 +77,16 @@ def main() :
     
     # hard-coded values
     random_seed = 42
-    data_file = "../data/A_preds_eu27.csv"
+    data_file = "../data/A_preds_eu42.csv"
     results_base_file_name = "results.csv"
     fitness_names = ["mean_soja", "std_soja", "total_surface"]
     fitness_names = ["mean_soja", "std_soja"]
     n_objectives = len(fitness_names)
-    algorithm_class = MOEAD # it can also be NSGA2
+    algorithm_class = NSGA2 # it can also be NSGA2
     
     # hyperparameters for MOEA/D and NSGA2
-    population_size = 500
-    max_generations = 100
+    population_size = 1000
+    max_generations = 100000
     n_partitions = 1000
     n_neighbors = 15
     prob_neighbor_mating = 0.7
@@ -144,7 +144,7 @@ def main() :
     # start the run
     result = minimize(problem, 
                       algorithm, 
-                      termination, 
+                      #termination, # computing the convex hull takes too much time 
                       ('n_gen', max_generations), 
                       seed=random_seed, 
                       verbose=True)

@@ -33,6 +33,9 @@ y: latitude
 mean_Ya_pred and sd_Ya_pred: mean and standard deviation of yield over the 2000-2017 period per site
 Following columns (from 2000 to 2017) are estimated annual yields.
 
+## 2024-08-13
+Turns out, most of the issues were due to algorithmic problems. The pymoo implementation of NSGA-II works really well, now the last thing is to tune hyperparameters. Unfortunately, pymoo's NSGA-II becomes much slower when it starts checking stagnation (it has to recompute the hypervolume of the Pareto front at every generation). So, right now probably the best way to go is to set `mu=1000` and `max_generations=100000`.
+
 ## 2024-01-26
 There might be some issues.
 
