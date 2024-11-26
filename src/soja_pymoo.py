@@ -105,11 +105,12 @@ class SavePopulationCallback(Callback) :
     
     # class constructor
     def __init__(self, folder, population_file_name, generational_interval=100,
-                 overwrite_file=False) :
+                 fitness_names=None, overwrite_file=False) :
         super().__init__()
         self.folder = folder
         self.population_file_name = population_file_name
-        self.generational_interval = 100
+        self.generational_interval = generational_interval
+        self.fitness_names = fitness_names
         
     # this method is called at every iteration of the algorithm
     def notify(self, algorithm) :
@@ -121,10 +122,14 @@ class SavePopulationCallback(Callback) :
             X = algorithm.pop.get("X")
             F = algorithm.pop.get("F")
             
+            # check: if fitness_names has not been specified, set it up
+            if self.fitness_names is None :
+                self.fitness_names = ["fitness_%d" % (i+1) for i in range(0, F.shape[1])]
+            
             results_dictionary = dict()
             results_dictionary["generation"] = [generation] * X.shape[0]
             for i in range(0, F.shape[1]) :
-                results_dictionary["fitness_%d" % (i+1)] = F[:,i]
+                results_dictionary[ self.fitness_names[i] ] = F[:,i]
             for i in range(0, X.shape[1]) :
                 results_dictionary["variable_%d" % i] = X[:,i]
             df_results = pd.DataFrame.from_dict(results_dictionary)
@@ -194,7 +199,8 @@ def main() :
                                         )
     
     # prepare an instance of the Callback class that will be used to save the population
-    callback = SavePopulationCallback(results_folder, "population-generation")
+    callback = SavePopulationCallback(results_folder, "population-generation",
+                                      generational_interval=10, fitness_names=fitness_names)
     
     # prepare the initial population; if population seeding has been specified,
     # proceed accordingly
