@@ -52,17 +52,17 @@ if __name__ == "__main__" :
             
             # generate the Pareto fronts for the two different algorithms;
             # 'mean_soja' needs to be converted to a minimization objective
-            df_lin = df_experiment[df_experiment["algo"] == "lin"]
+            df_lin = df_selected[df_experiment["algo"] == "lin"]
             pf_lin = df_lin[objectives].values
             pf_lin[:,0] = -1 * pf_lin[:,0] # 'mean_soja' is always objective 0
             
-            df_nsga = df_experiment[df_experiment["algo"] == "nsga"]
+            df_nsga = df_selected[df_experiment["algo"] == "nsga"]
             pf_nsga = df_nsga[objectives].values
             pf_nsga[:,0] = -1 * pf_nsga[:,0]
             
             # now, normalize everything
             scaler = MinMaxScaler()
-            scaler.fit(df_experiment[objectives].values)
+            scaler.fit(df_selected[objectives].values)
             pf_lin_norm = scaler.transform(pf_lin)
             pf_nsga_norm = scaler.transform(pf_nsga)
             
@@ -74,9 +74,9 @@ if __name__ == "__main__" :
             ref_point = np.array(ref_point)
             
             # then, instantiate the object and perform the proper computation
-            hv_experiment = HV(ref_point=ref_point)
-            hv_lin = hv_experiment(pf_lin_norm)
-            hv_nsga = hv_experiment(pf_nsga_norm)
+            hv_selected = HV(ref_point=ref_point)
+            hv_lin = hv_selected(pf_lin_norm)
+            hv_nsga = hv_selected(pf_nsga_norm)
             
             # update results
             results['experiment'].append(experiment)
